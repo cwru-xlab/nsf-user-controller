@@ -43,5 +43,5 @@ testing {
 }
 
 application {
-    mainClass = "nsf.user.controller.App"
+    mainClass = "" // TODO
 }
