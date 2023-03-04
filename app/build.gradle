@@ -17,12 +17,14 @@ repositories {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(11)
         vendor = JvmVendorSpec.ADOPTIUM
     }
 }
 
 dependencies {
+    annotationProcessor "org.immutables:value:2.9.2"
+
     compileOnly "org.immutables:builder:2.9.2"
     compileOnly "org.immutables:value:2.9.2"
 
