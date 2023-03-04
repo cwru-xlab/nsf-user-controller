@@ -1,3 +1,5 @@
+package nsf;
+
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -18,6 +20,6 @@ import org.immutables.value.Value.Style.ImplementationVisibility;
     typeAbstract = "Base*",
     typeImmutable = "*",
     defaults = @Value.Immutable(copy = false, lazyhash = true))
-@interface ImmutableStyle {
+public @interface ImmutableStyle {
 
 }
