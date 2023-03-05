@@ -20,13 +20,13 @@ public interface DataService {
   Call<List<Record>> get(@Path("endpoint") String endpoint);
 
   @POST("data/{endpoint}")
-  Call<List<Record>> post(@Path("endpoint") String endpoint, @Body Collection<Record> records);
+  Call<List<Record>> post(@Path("endpoint") String endpoint, @Body List<Record> records);
 
   @POST("data/{endpoint}")
   Call<Record> post(@Path("endpoint") String endpoint, @Body Record record);
 
   @PUT("data")
-  Call<List<Record>> put(@Body Collection<Record> records);
+  Call<List<Record>> put(@Body List<Record> records);
 
   @DELETE("data")
   Call<Void> delete(@Query("records") String... recordIds);
