@@ -16,8 +16,9 @@ import retrofit2.Response;
 @Value.Immutable
 abstract class BaseTokenService implements AutoCloseable {
 
+  public static final String TOKEN_HEADER = "x-auth-token";
+
   private static final long INITIAL_REFRESH_DELAY = 0;
-  private static final String TOKEN_HEADER = "x-auth-token";
   private static final String UNABLE_TO_RENEW_TOKEN_MSG =
       "Unable to renew token; the '" + TOKEN_HEADER + "' header is missing";
 
@@ -70,7 +71,7 @@ abstract class BaseTokenService implements AutoCloseable {
     token().set(checkNotNull(token));
   }
 
-  public void renewToken(Response<?> response) {
+  public void renewToken(okhttp3.Response response) {
     String value = checkNotNull(response.headers().get(TOKEN_HEADER), UNABLE_TO_RENEW_TOKEN_MSG);
     token().getAndUpdate(t -> t.withValue(value));
   }
