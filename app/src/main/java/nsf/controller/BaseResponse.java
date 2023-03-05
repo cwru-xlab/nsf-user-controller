@@ -5,7 +5,7 @@ import java.util.Optional;
 import org.immutables.value.Value;
 
 @Value.Immutable
-public abstract class Response {
+abstract class BaseResponse {
 
   public abstract Optional<Data> data();
 
