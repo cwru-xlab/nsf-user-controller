@@ -1,8 +1,7 @@
-package nsf.pda;
+package nsf.pda.data;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
@@ -10,7 +9,7 @@ import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
-import retrofit2.http.QueryMap;
+import retrofit2.http.Query;
 
 public interface DataService {
 
@@ -30,6 +29,6 @@ public interface DataService {
   Call<List<Record>> put(@Body Collection<Record> records);
 
   @DELETE("data")
-  Call<Void> delete(@QueryMap Map<String, String> recordIds);
+  Call<Void> delete(@Query("records") String... recordIds);
 
 }

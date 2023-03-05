@@ -1,8 +1,9 @@
-package nsf.pda;
+package nsf.pda.data;
 
 import java.util.Locale;
 
 public enum Ordering {
+
   ASCENDING,
   DESCENDING;
 
