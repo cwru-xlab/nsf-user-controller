@@ -1,6 +1,7 @@
 package nsf.vertx;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Promise;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.eventbus.MessageProducer;
 import io.vertx.core.json.JsonObject;
@@ -22,7 +23,8 @@ public class TokenService extends AbstractVerticle {
   }
 
   @Override
-  public void start() {
+  public void start(Promise<Void> promise) {
+    // TODO Use promise to ensure token is instantiated before this verticle is considered deployed
     vertx.eventBus().consumer("auth.consumeToken", this::consumeToken);
     producer = vertx.eventBus().publisher("auth.publishToken");
     timeId = vertx.setPeriodic(0L, getTokenTtlMillis(), this::fetchAndPublishToken);
