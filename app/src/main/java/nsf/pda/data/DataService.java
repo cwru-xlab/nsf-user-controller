@@ -13,16 +13,19 @@ import retrofit2.http.Query;
 public interface DataService {
 
   @GET("data/{endpoint}")
-  Call<List<Record>> get(@Path("endpoint") String endpoint, @Body GetOptions options);
+  Call<List<Record>> get(
+      @Path(value = "endpoint", encoded = true) String endpoint, @Body GetOptions options);
 
   @GET("data/{endpoint}")
-  Call<List<Record>> get(@Path("endpoint") String endpoint);
+  Call<List<Record>> get(@Path(value = "endpoint", encoded = true) String endpoint);
 
   @POST("data/{endpoint}")
-  Call<List<Record>> post(@Path("endpoint") String endpoint, @Body List<Record> records);
+  Call<List<Record>> post(
+      @Path(value = "endpoint", encoded = true) String endpoint, @Body List<Record> data);
 
   @POST("data/{endpoint}")
-  Call<Record> post(@Path("endpoint") String endpoint, @Body Record record);
+  Call<Record> post(
+      @Path(value = "endpoint", encoded = true) String endpoint, @Body Record data);
 
   @PUT("data")
   Call<List<Record>> put(@Body List<Record> records);
@@ -30,4 +33,6 @@ public interface DataService {
   @DELETE("data")
   Call<Void> delete(@Query("records") String... recordIds);
 
+  @DELETE("data")
+  Call<Void> delete(@Query("records") List<String> recordIds);
 }
