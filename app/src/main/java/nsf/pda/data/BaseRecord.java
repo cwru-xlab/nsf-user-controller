@@ -1,7 +1,6 @@
 package nsf.pda.data;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import nsf.pda.data.Record;
 import org.immutables.value.Value;
 
 @Value.Immutable
