@@ -2,6 +2,8 @@ package nsf.pda.auth;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -10,15 +12,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.immutables.value.Value;
 import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 @Value.Immutable
 abstract class BaseTokenService implements AutoCloseable {
 
   public static final String TOKEN_HEADER = "x-auth-token";
 
-  private static final long INITIAL_REFRESH_DELAY = 0;
   private static final String UNABLE_TO_RENEW_TOKEN_MSG =
       "Unable to renew token; the '" + TOKEN_HEADER + "' header is missing";
 
@@ -36,25 +35,19 @@ abstract class BaseTokenService implements AutoCloseable {
     return Duration.ofDays(29);
   }
 
-  @Value.Default
-  protected Duration timeout() {
-    return Duration.ofSeconds(5);
-  }
-
   @Value.Derived
   protected AtomicReference<AccessToken> token() {
     return new AtomicReference<>();
   }
 
   @Value.Derived
-  protected Callback<AccessToken> callback() {
-    return new TokenCallback(this);
-  }
-
-  @Value.Derived
   protected ScheduledFuture<?> scheduledFetchToken() {
+    // Make a blocking call to initialize the token value to avoid race conditions...
+    fetchAndSetToken();
+    // ...and then rely on the scheduler to update it in the background.
+    long delay = tokenTtl().getSeconds();
     return scheduler().scheduleWithFixedDelay(
-        this::fetchAndSetToken, INITIAL_REFRESH_DELAY, tokenTtl().getSeconds(), TimeUnit.SECONDS);
+        this::fetchAndSetToken, delay, delay, TimeUnit.SECONDS);
   }
 
   @Override
@@ -62,7 +55,6 @@ abstract class BaseTokenService implements AutoCloseable {
     scheduler().shutdown();
   }
 
-  // TODO How to avoid race condition between initial setting and getting?
   public AccessToken getToken() {
     return token().get();
   }
@@ -77,29 +69,20 @@ abstract class BaseTokenService implements AutoCloseable {
   }
 
   private void fetchAndSetToken() {
-    String username = credentials().username();
-    String password = credentials().password();
-    Call<AccessToken> call = authenticator().authenticate(username, password);
-    call.enqueue(callback());
+    setToken(fetchToken());
   }
 
-  private static final class TokenCallback implements Callback<AccessToken> {
+  private Call<AccessToken> fetchToken() {
+    String username = credentials().username();
+    String password = credentials().password();
+    return authenticator().authenticate(username, password);
+  }
 
-    private final BaseTokenService tokenService;
-
-    public TokenCallback(BaseTokenService tokenService) {
-      this.tokenService = tokenService;
-    }
-
-    @Override
-    public void onResponse(Call<AccessToken> call, Response<AccessToken> response) {
-      tokenService.setToken(response.body());
-      System.out.println("Setting new token: " + tokenService.getToken());
-    }
-
-    @Override
-    public void onFailure(Call<AccessToken> call, Throwable throwable) {
-      System.out.println("Unable to fetch token: " + throwable);
+  private void setToken(Call<AccessToken> call) {
+    try {
+      setToken(call.execute().body());
+    } catch (IOException exception) {
+      throw new UncheckedIOException(exception);
     }
   }
 }
