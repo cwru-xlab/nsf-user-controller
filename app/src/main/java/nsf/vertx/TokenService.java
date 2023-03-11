@@ -1,5 +1,7 @@
 package nsf.vertx;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Header;
@@ -11,6 +13,7 @@ import io.jsonwebtoken.security.SignatureException;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.Verticle;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.MessageProducer;
 import io.vertx.core.json.JsonObject;
@@ -38,12 +41,16 @@ public final class TokenService extends AbstractVerticle {
   private byte[] publicKey;
   private long timerId;
 
-  public TokenService(WebClient client, String host, Clock clock) {
-    this.client = client;
-    this.host = host;
-    this.clock = clock;
+  private TokenService(Builder builder) {
+    this.client = builder.client;
+    this.host = builder.host;
+    this.clock = builder.clock;
     this.publisher = vertx.eventBus().publisher("auth.publishToken");
     this.timerId = UNSET_TIMER_ID;
+  }
+
+  public static Builder builder() {
+    return new Builder();
   }
 
   @Override
@@ -141,6 +148,35 @@ public final class TokenService extends AbstractVerticle {
   private void logIfErrorEnabled(Supplier<String> message, Throwable throwable) {
     if (logger.isErrorEnabled()) {
       logger.error(message.get(), throwable);
+    }
+  }
+
+  public static final class Builder {
+
+    private WebClient client;
+    private String host;
+    private Clock clock;
+
+    public Builder client(WebClient value) {
+      client = value;
+      return this;
+    }
+
+    public Builder host(String value) {
+      host = value;
+      return this;
+    }
+
+    public Builder clock(Clock value) {
+      clock = value;
+      return this;
+    }
+
+    public Verticle build() {
+      checkNotNull(client);
+      checkNotNull(host);
+      checkNotNull(clock);
+      return new TokenService(this);
     }
   }
 }
