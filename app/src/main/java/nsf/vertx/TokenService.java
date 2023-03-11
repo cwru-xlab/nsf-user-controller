@@ -83,8 +83,7 @@ public final class TokenService extends AbstractVerticle {
         .as(BodyCodec.jsonObject())
         .send()
         .onSuccess(this::verifyAndPublishToken)
-        .onFailure(this::logTokenFetchFailure)
-        .mapEmpty();
+        .onFailure(this::logTokenFetchFailure);
   }
 
   private void verifyAndPublishToken(HttpResponse<JsonObject> response) {
