@@ -80,7 +80,7 @@ public final class TokenService extends AbstractVerticle {
   }
 
   private void logPublicKeyFetchFailure(Throwable throwable) {
-    logError(throwable, "Unable to fetch public key for host {}", host);
+    logError(throwable, "Failed to fetch public key for host {}", host);
   }
 
   private void fetchAndPublishToken() {
@@ -96,7 +96,7 @@ public final class TokenService extends AbstractVerticle {
     String token = response.body().getString("accessToken");
     verifyToken(token)
         .onSuccess(this::startPeriodRefresh)
-        .onFailure(this::logError)
+        .onFailure(this::logTokenVerificationFailure)
         .andThen(x -> publisher.write(token));
   }
 
@@ -138,11 +138,11 @@ public final class TokenService extends AbstractVerticle {
   }
 
   private void logTokenFetchFailure(Throwable throwable) {
-    logError(throwable, "Unable to fetch access token for host {}", host);
+    logError(throwable, "Failed to fetch access token for host {}", host);
   }
 
-  private void logError(Throwable throwable) {
-    logger.atError().setCause(throwable).log();
+  private void logTokenVerificationFailure(Throwable throwable) {
+    logError(throwable, "Failed to verify or parse access token for host {}", host);
   }
 
   private void logError(Throwable throwable, String message, String arg) {
