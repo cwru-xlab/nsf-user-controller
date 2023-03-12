@@ -24,7 +24,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +80,7 @@ public final class TokenService extends AbstractVerticle {
   }
 
   private void logPublicKeyFetchFailure(Throwable throwable) {
-    logIfErrorEnabled(() -> "Unable to fetch public key for host " + host, throwable);
+    logError(throwable, "Unable to fetch public key for host {}", host);
   }
 
   private void fetchAndPublishToken() {
@@ -97,7 +96,7 @@ public final class TokenService extends AbstractVerticle {
     String token = response.body().getString("accessToken");
     verifyToken(token)
         .onSuccess(this::startPeriodRefresh)
-        .onFailure(this::logTokenVerificationFailure)
+        .onFailure(this::logError)
         .andThen(x -> publisher.write(token));
   }
 
@@ -107,6 +106,7 @@ public final class TokenService extends AbstractVerticle {
       return Future.succeededFuture(
           Jwts.parserBuilder()
               .requireIssuer(host)
+              .require("resource", host)
               .require("accessScope", "owner")
               .setClock(this::now)
               .setSigningKey(publicKey)
@@ -137,18 +137,16 @@ public final class TokenService extends AbstractVerticle {
     return timerId < 0;
   }
 
-  private void logTokenVerificationFailure(Throwable throwable) {
-    logIfErrorEnabled(throwable::getMessage, throwable);
-  }
-
   private void logTokenFetchFailure(Throwable throwable) {
-    logIfErrorEnabled(() -> "Unable to fetch access token for host " + host, throwable);
+    logError(throwable, "Unable to fetch access token for host {}", host);
   }
 
-  private void logIfErrorEnabled(Supplier<String> message, Throwable throwable) {
-    if (logger.isErrorEnabled()) {
-      logger.error(message.get(), throwable);
-    }
+  private void logError(Throwable throwable) {
+    logger.atError().setCause(throwable).log();
+  }
+
+  private void logError(Throwable throwable, String message, String arg) {
+    logger.atError().setCause(throwable).setMessage(message).addArgument(arg).log();
   }
 
   public static final class Builder {
