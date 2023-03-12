@@ -1,5 +1,11 @@
 package nsf.pda;
 
-public class PdaException extends RuntimeException {
+import nsf.controller.DataAccessException;
 
+public class PdaException extends DataAccessException {
+  private int statusCode;
+
+  public PdaException(int statusCode){
+    this.statusCode = statusCode;
+  }
 }

@@ -1,23 +1,36 @@
 package nsf.controller;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
+ * Data Access Request model (sent from service providers).
+ */
 public class DataAccessRequest {
-    private String operation;
-    private String resourceUri;
+  public enum DataAccessOperation {
+    READ,
+    WRITE,
+    DELETE;
+  }
 
+  private DataAccessOperation operation;
+  @JsonIgnore
+  private DataResourceIdentifier resourceIdentifier;
 
-    public String getOperation() {
-        return operation;
-    }
+  public DataAccessOperation getOperation() {
+    return operation;
+  }
 
-    public void setOperation(String operation) {
-        this.operation = operation;
-    }
+  public void setOperation(DataAccessOperation operation) {
+    this.operation = operation;
+  }
 
-    public String getResourceUri() {
-        return resourceUri;
-    }
+  public DataResourceIdentifier getResourceIdentifier() {
+    return resourceIdentifier;
+  }
 
-    public void setResourceUri(String resourceUri) {
-        this.resourceUri = resourceUri;
-    }
+  @JsonProperty("resourceUri")
+  public void setResourceUri(String resourceUri) throws Exception {
+    this.resourceIdentifier = new DataResourceIdentifier(resourceUri);
+  }
 }
