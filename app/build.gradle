@@ -9,6 +9,7 @@
 
 plugins {
     id "application"
+    id "java-test-fixtures"
 }
 
 repositories {
@@ -46,6 +47,9 @@ dependencies {
     testImplementation "org.mockito:mockito-junit-jupiter:5.1.1"
     testImplementation "io.vertx:vertx-junit5:4.4.0"
     testImplementation "com.squareup.okhttp3:mockwebserver:5.0.0-alpha.11"
+    testFixturesImplementation "io.jsonwebtoken:jjwt-api:0.11.5"
+    testRuntimeOnly "io.jsonwebtoken:jjwt-impl:0.11.5"
+    testRuntimeOnly "io.jsonwebtoken:jjwt-jackson:0.11.5"
 }
 
 testing {
