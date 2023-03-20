@@ -11,6 +11,6 @@ public abstract class AbstractTokenStore implements TokenStore {
 
   @Override
   public Future<Token> get(PublicKey publicKey) {
-    return getUnverified(publicKey).flatMap(token -> verifier().verify(token, publicKey));
+    return getUnverified(publicKey).map(token -> verifier().verify(token, publicKey));
   }
 }
