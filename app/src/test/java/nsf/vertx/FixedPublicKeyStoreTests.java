@@ -9,7 +9,7 @@ import vertx.KeyPairs;
 public class FixedPublicKeyStoreTests {
 
   @Test
-  public void whenPublicKeyIsRetrievedThenFutureResultEqualsConstructorValue() {
+  public void whenPublicKeyIsRetrievedThenFutureEqualsConstructorValue() {
     PublicKey publicKey = KeyPairs.correctPublic();
     PublicKeyStore keyStore = FixedPublicKeyStore.of(publicKey);
     assertEquals(publicKey, keyStore.get().result());

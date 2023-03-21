@@ -7,8 +7,6 @@ import static org.mockito.Mockito.when;
 
 import io.vertx.core.Future;
 import java.security.PublicKey;
-import java.time.Duration;
-import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,10 +19,7 @@ import vertx.Tokens;
 @ExtendWith(MockitoExtension.class)
 public class FixedTokenStoreTests {
 
-  private static final Instant IAT = Instant.EPOCH;
-  private static final Instant EXP = IAT.plus(Duration.ofDays(1));
-  private static final Token TOKEN = Tokens.valid(IAT, EXP);
-
+  private static final Token TOKEN = Tokens.valid(Tokens.issuedAt(), Tokens.expiresAt());
   private static final Class<? extends Throwable> EXCEPTION = TokenException.class;
 
   @Mock(stubOnly = true)

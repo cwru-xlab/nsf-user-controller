@@ -3,6 +3,7 @@ package vertx;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import nsf.vertx.DecodedTokenBuilder;
@@ -16,6 +17,26 @@ public final class Tokens {
 
   public static String host() {
     return "test.host.com";
+  }
+
+  public static Duration timeToLive() {
+    return Duration.ofDays(2);
+  }
+
+  public static Instant issuedAt() {
+    return Instant.EPOCH;
+  }
+
+  public static Instant expiresAt() {
+    return issuedAt().plus(timeToLive());
+  }
+
+  public static Instant now() {
+    return issuedAt().plus(timeToLive().dividedBy(2));
+  }
+
+  public static Instant afterExpiration() {
+    return expiresAt().plus(Duration.ofMillis(1));
   }
 
   public static Token valid(Instant issuedAt, Instant expiresAt) {

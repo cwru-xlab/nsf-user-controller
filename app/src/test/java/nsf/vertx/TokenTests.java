@@ -1,20 +1,33 @@
 package nsf.vertx;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import vertx.Tokens;
 
 public class TokenTests {
 
-  private static final Duration TTL = Duration.ofDays(1);
-  private static final Instant IAT = Instant.EPOCH;
-  private static final Instant EXP = IAT.plus(TTL);
-
   @Test
-  public void whenIatIsAfterExpThenIllegalStateException() {
-    assertEquals(TTL, Tokens.valid(IAT, EXP).timeToLive());
+  public void whenValidTokenIsCreatedThenTimeToLiveEqualsExpectedValue() {
+    Token token = Tokens.valid(Tokens.issuedAt(), Tokens.expiresAt());
+    assertEquals(Tokens.timeToLive(), token.timeToLive());
+  }
+
+  @ParameterizedTest(name = ParameterizedTest.INDEX_PLACEHOLDER + " {0}: {2}")
+  @MethodSource("invalidTokens")
+  @SuppressWarnings("unused")
+  public void whenInvalidTokenIsCreatedThenTimeToLiveThrowsException(String testName, Token token) {
+    assertThrowsExactly(NullPointerException.class, token::timeToLive);
+  }
+
+  private static Stream<Arguments> invalidTokens() {
+    return Stream.of(
+        Arguments.of("MissingIssuedAtClaim", Tokens.missingIssuedAtClaim(Tokens.expiresAt())),
+        Arguments.of("MissingExpiresAtClaim", Tokens.missingExpiresAtClaim(Tokens.issuedAt())));
   }
 }
