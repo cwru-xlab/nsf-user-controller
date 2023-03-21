@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import io.jsonwebtoken.ClaimJwtException;
 import io.jsonwebtoken.Claims;

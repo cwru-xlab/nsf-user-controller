@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 public final class TokenException extends RuntimeException {
 

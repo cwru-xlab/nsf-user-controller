@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,8 +16,8 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import vertx.KeyPairs;
-import vertx.Tokens;
+import vertx.auth.KeyPairs;
+import vertx.auth.Tokens;
 
 public class TokenDecoderTests {
 

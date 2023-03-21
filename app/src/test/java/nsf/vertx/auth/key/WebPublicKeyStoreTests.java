@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import vertx.KeyPairs;
+import vertx.auth.KeyPairs;
 
 @ExtendWith(VertxExtension.class)
 public class WebPublicKeyStoreTests {

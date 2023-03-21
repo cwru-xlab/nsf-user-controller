@@ -1,4 +1,4 @@
-package vertx;
+package vertx.auth;
 
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;

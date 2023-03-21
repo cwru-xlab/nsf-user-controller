@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth;
 
 import io.vertx.ext.web.client.WebClient;
 

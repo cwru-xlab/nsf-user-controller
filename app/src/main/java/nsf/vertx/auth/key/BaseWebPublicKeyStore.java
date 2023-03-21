@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.key;
 
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
@@ -6,6 +6,7 @@ import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.codec.BodyCodec;
 import java.security.PublicKey;
+import nsf.vertx.auth.WebStore;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import java.io.IOException;
 import okhttp3.mockwebserver.MockWebServer;

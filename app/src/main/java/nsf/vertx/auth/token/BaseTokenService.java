@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -6,6 +6,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.eventbus.MessageProducer;
 import java.security.PublicKey;
 import java.util.concurrent.atomic.AtomicLong;
+import nsf.vertx.auth.key.PublicKeyStore;
 import org.immutables.value.Value;
 
 @Value.Immutable

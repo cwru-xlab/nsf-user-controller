@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import io.vertx.junit5.VertxExtension;
 import java.io.IOException;

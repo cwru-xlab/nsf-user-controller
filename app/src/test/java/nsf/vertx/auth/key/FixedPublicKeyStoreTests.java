@@ -1,10 +1,10 @@
-package nsf.vertx;
+package nsf.vertx.auth.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.security.PublicKey;
 import org.junit.jupiter.api.Test;
-import vertx.KeyPairs;
+import vertx.auth.KeyPairs;
 
 public class FixedPublicKeyStoreTests {
 

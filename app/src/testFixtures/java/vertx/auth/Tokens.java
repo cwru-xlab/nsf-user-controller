@@ -1,4 +1,4 @@
-package vertx;
+package vertx.auth;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -6,9 +6,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import nsf.vertx.DecodedTokenBuilder;
-import nsf.vertx.EncodedTokenBuilder;
-import nsf.vertx.Token;
+import nsf.vertx.auth.token.DecodedTokenBuilder;
+import nsf.vertx.auth.token.EncodedTokenBuilder;
+import nsf.vertx.auth.token.Token;
 
 public final class Tokens {
 

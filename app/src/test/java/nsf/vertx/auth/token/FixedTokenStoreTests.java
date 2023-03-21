@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.vertx.auth.token;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
@@ -13,8 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.OngoingStubbing;
-import vertx.KeyPairs;
-import vertx.Tokens;
+import vertx.auth.KeyPairs;
+import vertx.auth.Tokens;
 
 @ExtendWith(MockitoExtension.class)
 public class FixedTokenStoreTests {
