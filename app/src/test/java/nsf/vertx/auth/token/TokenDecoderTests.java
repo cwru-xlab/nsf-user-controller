@@ -83,10 +83,10 @@ public class TokenDecoderTests {
     return () -> decode(TOKEN, Tokens.afterExpiration());
   }
 
-  private static void decode(String encoded, Instant now) {
+  private static void decode(String encoded, Instant clockTime) {
     TokenDecoder.builder()
         .host(Tokens.host())
-        .clock(Clock.fixed(now, ZoneOffset.UTC))
+        .clock(Clock.fixed(clockTime, ZoneOffset.UTC))
         .build()
         .decode(encoded, KeyPairs.correctPublic());
   }
