@@ -5,9 +5,9 @@ import io.jsonwebtoken.Jws;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import nsf.vertx.DecodedTokenBuilder;
 import nsf.vertx.EncodedTokenBuilder;
 import nsf.vertx.Token;
-import nsf.vertx.TokenParserBuilder;
 
 public final class Tokens {
 
@@ -18,134 +18,154 @@ public final class Tokens {
     return "test.host.com";
   }
 
-  public static Token valid(Instant iat, Instant exp) {
-    return Token.of(encodedValid(iat, exp), decodedValid(iat, exp));
+  public static Token valid(Instant issuedAt, Instant expiresAt) {
+    return Token.of(encodedValid(issuedAt, expiresAt), decodedValid(issuedAt, expiresAt));
   }
 
-  public static String encodedValid(Instant iat, Instant exp) {
+  public static String encodedValid(Instant issuedAt, Instant expiresAt) {
     return EncodedTokenBuilder.create()
-        .iss(host())
-        .iat(iat)
-        .exp(exp)
-        .privateKey(KeyPairs.correctPrivate())
-        .resource(host())
+        .host(host())
+        .issuedAt(issuedAt)
+        .expiresAt(expiresAt)
+        .addIssuer(true)
+        .addResource(true)
         .addAccessScope(true)
+        .privateKey(KeyPairs.correctPrivate())
         .build();
   }
 
-  public static Jws<Claims> decodedValid(Instant iat, Instant exp) {
-    return decode(encodedValid(iat, exp), iat);
+  public static Jws<Claims> decodedValid(Instant issuedAt, Instant expiresAt) {
+    return decode(encodedValid(issuedAt, expiresAt), issuedAt);
   }
 
-  public static Token missingIssClaim(Instant iat, Instant exp) {
-    return Token.of(encodedMissingIssClaim(iat, exp), decodedMissingIssClaim(iat, exp));
+  public static Token missingIssuerClaim(Instant issuedAt, Instant expiresAt) {
+    return Token.builder()
+        .encoded(encodedMissingIssuerClaim(issuedAt, expiresAt))
+        .decoded(decodedMissingIssuerClaim(issuedAt, expiresAt))
+        .build();
   }
 
-  public static String encodedMissingIssClaim(Instant iat, Instant exp) {
+  public static String encodedMissingIssuerClaim(Instant issuedAt, Instant expiresAt) {
     return EncodedTokenBuilder.create()
-        .iat(iat)
-        .exp(exp)
-        .privateKey(KeyPairs.correctPrivate())
-        .resource(host())
+        .host(host())
+        .issuedAt(issuedAt)
+        .expiresAt(expiresAt)
+        .addIssuer(false)
+        .addResource(true)
         .addAccessScope(true)
+        .privateKey(KeyPairs.correctPrivate())
         .build();
   }
 
-  public static Jws<Claims> decodedMissingIssClaim(Instant iat, Instant exp) {
-    return decode(encodedMissingIssClaim(iat, exp), iat);
+  public static Jws<Claims> decodedMissingIssuerClaim(Instant issuedAt, Instant expiresAt) {
+    return decode(encodedMissingIssuerClaim(issuedAt, expiresAt), issuedAt);
   }
 
-  public static Token missingIatClaim(Instant exp) {
-    return Token.of(encodedMissingIatClaim(exp), decodedMissingIatClaim(exp));
+  public static Token missingIssuedAtClaim(Instant expiresAt) {
+    return Token.of(encodedMissingIssuedAtClaim(expiresAt), decodedMissingIssuedAtClaim(expiresAt));
   }
 
-  public static String encodedMissingIatClaim(Instant exp) {
+  public static String encodedMissingIssuedAtClaim(Instant expiresAt) {
     return EncodedTokenBuilder.create()
-        .iss(host())
-        .exp(exp)
-        .privateKey(KeyPairs.correctPrivate())
-        .resource(host())
+        .host(host())
+        .expiresAt(expiresAt)
+        .addIssuer(true)
+        .addResource(true)
         .addAccessScope(true)
+        .privateKey(KeyPairs.correctPrivate())
         .build();
   }
 
-  public static Jws<Claims> decodedMissingIatClaim(Instant exp) {
-    return decode(encodedMissingIatClaim(exp), exp);
+  public static Jws<Claims> decodedMissingIssuedAtClaim(Instant expiresAt) {
+    return decode(encodedMissingIssuedAtClaim(expiresAt), expiresAt);
   }
 
-  public static Token missingExpClaim(Instant iat) {
-    return Token.of(encodedMissingExpClaim(iat), decodedMissingExpClaim(iat));
+  public static Token missingExpiresAtClaim(Instant issuedAt) {
+    return Token.of(encodedMissingExpiresAt(issuedAt), decodedMissingExpiresAt(issuedAt));
   }
 
-  public static String encodedMissingExpClaim(Instant iat) {
+  public static String encodedMissingExpiresAt(Instant issuedAt) {
     return EncodedTokenBuilder.create()
-        .iss(host())
-        .iat(iat)
-        .privateKey(KeyPairs.correctPrivate())
-        .resource(host())
+        .host(host())
+        .issuedAt(issuedAt)
+        .addIssuer(true)
+        .addResource(true)
         .addAccessScope(true)
+        .privateKey(KeyPairs.correctPrivate())
         .build();
   }
 
-  public static Jws<Claims> decodedMissingExpClaim(Instant iat) {
-    return decode(encodedMissingExpClaim(iat), iat);
+  public static Jws<Claims> decodedMissingExpiresAt(Instant issuedAt) {
+    return decode(encodedMissingExpiresAt(issuedAt), issuedAt);
   }
 
-  public static Token missingResourceClaim(Instant iat, Instant exp) {
-    return Token.of(encodedMissingResourceClaim(iat, exp), decodedMissingResourceClaim(iat, exp));
+  public static Token missingResourceClaim(Instant issuedAt, Instant expiresAt) {
+    return Token.builder()
+        .encoded(encodedMissingResourceClaim(issuedAt, expiresAt))
+        .decoded(decodedMissingResourceClaim(issuedAt, expiresAt))
+        .build();
   }
 
-  public static String encodedMissingResourceClaim(Instant iat, Instant exp) {
+  public static String encodedMissingResourceClaim(Instant issuedAt, Instant expiresAt) {
     return EncodedTokenBuilder.create()
-        .iss(host())
-        .iat(iat)
-        .exp(exp)
-        .privateKey(KeyPairs.correctPrivate())
+        .host(host())
+        .issuedAt(issuedAt)
+        .expiresAt(expiresAt)
+        .addIssuer(true)
+        .addResource(false)
         .addAccessScope(true)
-        .build();
-  }
-
-  public static Jws<Claims> decodedMissingResourceClaim(Instant iat, Instant exp) {
-    return decode(encodedMissingResourceClaim(iat, exp), iat);
-  }
-
-  public static Token missingAccessScopeClaim(Instant iat, Instant exp) {
-    return Token.of(
-        encodedMissingAccessScopeClaim(iat, exp),
-        decodedMissingAccessScopeClaim(iat, exp));
-  }
-
-  public static String encodedMissingAccessScopeClaim(Instant iat, Instant exp) {
-    return EncodedTokenBuilder.create()
-        .iss(host())
-        .iat(iat)
-        .exp(exp)
         .privateKey(KeyPairs.correctPrivate())
-        .resource(host())
         .build();
   }
 
-  public static Jws<Claims> decodedMissingAccessScopeClaim(Instant iat, Instant exp) {
-    return decode(encodedMissingAccessScopeClaim(iat, exp), iat);
+  public static Jws<Claims> decodedMissingResourceClaim(Instant issuedAt, Instant expiresAt) {
+    return decode(encodedMissingResourceClaim(issuedAt, expiresAt), issuedAt);
   }
 
-  public static Token wrongPrivateKey(Instant iat, Instant exp) {
-    return Token.of(encodedWrongPrivateKey(iat, exp), decodedWrongPrivateKey(iat, exp));
+  public static Token missingAccessScopeClaim(Instant issuedAt, Instant expiresAt) {
+    return Token.builder()
+        .encoded(encodedMissingAccessScopeClaim(issuedAt, expiresAt))
+        .decoded(decodedMissingAccessScopeClaim(issuedAt, expiresAt))
+        .build();
   }
 
-  public static String encodedWrongPrivateKey(Instant iat, Instant exp) {
+  public static String encodedMissingAccessScopeClaim(Instant issuedAt, Instant expiresAt) {
     return EncodedTokenBuilder.create()
-        .iss(host())
-        .iat(iat)
-        .exp(exp)
+        .host(host())
+        .issuedAt(issuedAt)
+        .expiresAt(expiresAt)
+        .addIssuer(true)
+        .addResource(true)
+        .addAccessScope(false)
+        .privateKey(KeyPairs.correctPrivate())
+        .build();
+  }
+
+  public static Jws<Claims> decodedMissingAccessScopeClaim(Instant issuedAt, Instant expiresAt) {
+    return decode(encodedMissingAccessScopeClaim(issuedAt, expiresAt), issuedAt);
+  }
+
+  public static Token incorrectPrivateKey(Instant issuedAt, Instant expiresAt) {
+    return Token.builder()
+        .encoded(encodedIncorrectPrivateKey(issuedAt, expiresAt))
+        .decoded(decodedIncorrectPrivateKey(issuedAt, expiresAt))
+        .build();
+  }
+
+  public static String encodedIncorrectPrivateKey(Instant issuedAt, Instant expiresAt) {
+    return EncodedTokenBuilder.create()
+        .host(host())
+        .issuedAt(issuedAt)
+        .expiresAt(expiresAt)
+        .addIssuer(true)
+        .addResource(true)
+        .addAccessScope(true)
         .privateKey(KeyPairs.incorrectPrivate())
-        .resource(host())
-        .addAccessScope(true)
         .build();
   }
 
-  public static Jws<Claims> decodedWrongPrivateKey(Instant iat, Instant exp) {
-    return decode(encodedWrongPrivateKey(iat, exp), iat);
+  public static Jws<Claims> decodedIncorrectPrivateKey(Instant issuedAt, Instant expiresAt) {
+    return decode(encodedIncorrectPrivateKey(issuedAt, expiresAt), issuedAt);
   }
 
   public static String encodedEmpty() {
@@ -153,11 +173,12 @@ public final class Tokens {
   }
 
   private static Jws<Claims> decode(String encoded, Instant clockTime) {
-    return TokenParserBuilder.create()
+    return DecodedTokenBuilder.create()
+        .encoded(encoded)
         .host(host())
-        .signingKey(KeyPairs.correctPublic())
+        .publicKey(KeyPairs.correctPublic())
         .clock(Clock.fixed(clockTime, ZoneOffset.UTC))
-        .build()
-        .parseClaimsJws(encoded);
+        .strict(false)
+        .build();
   }
 }

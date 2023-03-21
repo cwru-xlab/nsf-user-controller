@@ -17,15 +17,15 @@ abstract class BaseToken {
   @Value.Parameter(order = 2)
   public abstract Jws<Claims> decoded();
 
-  public Duration ttl() {
-    return Duration.between(iat(), exp());
+  public Duration timeToLive() {
+    return Duration.between(issuedAt(), expiresAt());
   }
 
-  private Instant iat() {
-    return checkNotNull(decoded().getBody().getIssuedAt(), "iat").toInstant();
+  private Instant issuedAt() {
+    return checkNotNull(decoded().getBody().getIssuedAt(), Claims.ISSUED_AT).toInstant();
   }
 
-  private Instant exp() {
-    return checkNotNull(decoded().getBody().getExpiration(), "exp").toInstant();
+  private Instant expiresAt() {
+    return checkNotNull(decoded().getBody().getExpiration(), Claims.EXPIRATION).toInstant();
   }
 }

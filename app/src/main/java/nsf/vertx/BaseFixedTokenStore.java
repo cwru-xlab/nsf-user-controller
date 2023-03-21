@@ -5,16 +5,14 @@ import java.security.PublicKey;
 import org.immutables.value.Value;
 
 @Value.Immutable
-abstract class BaseFixedTokenStore extends AbstractTokenStore {
+abstract class BaseFixedTokenStore extends AbstractTokenStore implements FixedValueStore<String> {
 
-  protected abstract String encoded();
-
-  public static TokenStore of(String encoded, TokenVerifier verifier) {
-    return FixedTokenStore.builder().encoded(encoded).verifier(verifier).build();
+  public static TokenStore of(String value, TokenDecoder decoder) {
+    return FixedTokenStore.builder().value(value).decoder(decoder).build();
   }
 
   @Override
-  protected Future<String> getUnverified(PublicKey publicKey) {
-    return Future.succeededFuture(encoded());
+  protected Future<String> getEncoded(PublicKey publicKey) {
+    return Future.succeededFuture(value());
   }
 }

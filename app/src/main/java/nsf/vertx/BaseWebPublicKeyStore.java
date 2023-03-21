@@ -11,15 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Value.Immutable
-abstract class BaseWebPublicKeyStore implements PublicKeyStore {
+abstract class BaseWebPublicKeyStore implements PublicKeyStore, WebStore {
 
   private static final Logger logger = LoggerFactory.getLogger(WebPublicKeyStore.class);
 
-  @Value.Parameter(order = 1)
-  protected abstract WebClient client();
-
-  @Value.Parameter(order = 2)
-  protected abstract String host();
+  public static PublicKeyStore of(WebClient client, String host) {
+    return WebPublicKeyStore.builder().client(client).host(host).build();
+  }
 
   @Override
   public Future<PublicKey> get() {

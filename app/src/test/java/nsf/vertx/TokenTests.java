@@ -15,6 +15,6 @@ public class TokenTests {
 
   @Test
   public void whenIatIsAfterExpThenIllegalStateException() {
-    assertEquals(TTL, Tokens.valid(IAT, EXP).ttl());
+    assertEquals(TTL, Tokens.valid(IAT, EXP).timeToLive());
   }
 }

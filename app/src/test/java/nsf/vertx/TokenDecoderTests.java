@@ -20,60 +20,60 @@ import org.junit.jupiter.params.provider.MethodSource;
 import vertx.KeyPairs;
 import vertx.Tokens;
 
-public class TokenVerifierTests {
+public class TokenDecoderTests {
 
-  private static final Duration TTL = Duration.ofDays(2);
-  private static final Instant IAT = Instant.EPOCH;
-  private static final Instant EXP = IAT.plus(TTL);
-  private static final Instant NOW = IAT.plus(TTL.dividedBy(2));
-  private static final Instant AFTER_EXP = EXP.plus(Duration.ofMillis(1));
-  private static final String VALID_TOKEN = Tokens.encodedValid(IAT, EXP);
+  private static final Duration TIME_TO_LIVE = Duration.ofDays(2);
+  private static final Instant ISSUED_AT = Instant.EPOCH;
+  private static final Instant EXPIRES_AT = ISSUED_AT.plus(TIME_TO_LIVE);
+  private static final Instant NOW = ISSUED_AT.plus(TIME_TO_LIVE.dividedBy(2));
+  private static final Instant AFTER_EXPIRATION = EXPIRES_AT.plus(Duration.ofMillis(1));
+  private static final String VALID_TOKEN = Tokens.encodedValid(ISSUED_AT, EXPIRES_AT);
 
   @Test
-  public void whenTokenIsValidThenTokenVerifierDoesNotThrowException() {
-    assertDoesNotThrow(verify(VALID_TOKEN));
+  public void whenTokenIsValidThenTokenDecoderDoesNotThrowException() {
+    assertDoesNotThrow(decode(VALID_TOKEN));
   }
 
   @ParameterizedTest(name = ParameterizedTest.INDEX_PLACEHOLDER + " {0}: {2}")
   @MethodSource("invalidTokens")
   @SuppressWarnings("unused")
-  public void whenTokenIsInvalidThenTokenVerifierThrowsException(
+  public void whenTokenIsInvalidThenTokenDecoderThrowsException(
       String testName, String token, Class<? extends Throwable> cause) {
-    Throwable thrown = assertThrowsExactly(TokenException.class, verify(token));
+    Throwable thrown = assertThrowsExactly(TokenException.class, decode(token));
     assertEquals(cause, thrown.getCause().getClass());
   }
 
   @Test
-  public void whenTimeIsAfterExpThenTokenVerifierThrowsException() {
-    Throwable thrown = assertThrowsExactly(TokenException.class, verifyExpired());
+  public void whenTimeIsAfterExpThenTokenDecoderThrowsException() {
+    Throwable thrown = assertThrowsExactly(TokenException.class, decodeExpired());
     assertEquals(ExpiredJwtException.class, thrown.getCause().getClass());
   }
 
   private static Stream<Arguments> invalidTokens() {
     return Stream.of(
         Arguments.of(
-            "MissingIssClaim",
-            Tokens.encodedMissingIssClaim(IAT, EXP),
+            "MissingIssuerClaim",
+            Tokens.encodedMissingIssuerClaim(ISSUED_AT, EXPIRES_AT),
             MissingClaimException.class),
         Arguments.of(
-            "MissingIatClaim",
-            Tokens.encodedMissingIatClaim(EXP),
+            "MissingIssuedAtClaim",
+            Tokens.encodedMissingIssuedAtClaim(EXPIRES_AT),
             MissingClaimException.class),
         Arguments.of(
-            "MissingExpClaim",
-            Tokens.encodedMissingExpClaim(IAT),
+            "MissingExpiresAtClaim",
+            Tokens.encodedMissingExpiresAt(ISSUED_AT),
             MissingClaimException.class),
         Arguments.of(
             "MissingResourceClaim",
-            Tokens.encodedMissingResourceClaim(IAT, EXP),
+            Tokens.encodedMissingResourceClaim(ISSUED_AT, EXPIRES_AT),
             MissingClaimException.class),
         Arguments.of(
             "MissingAccessScopeClaim",
-            Tokens.encodedMissingAccessScopeClaim(IAT, EXP),
+            Tokens.encodedMissingAccessScopeClaim(ISSUED_AT, EXPIRES_AT),
             MissingClaimException.class),
         Arguments.of(
-            "WrongPrivateKey",
-            Tokens.encodedWrongPrivateKey(IAT, EXP),
+            "IncorrectPrivateKey",
+            Tokens.encodedIncorrectPrivateKey(ISSUED_AT, EXPIRES_AT),
             SignatureException.class),
         Arguments.of(
             "EmptyToken",
@@ -81,19 +81,19 @@ public class TokenVerifierTests {
             IllegalArgumentException.class));
   }
 
-  private static Executable verify(String encoded) {
-    return () -> verify(encoded, NOW);
+  private static Executable decode(String encoded) {
+    return () -> decode(encoded, NOW);
   }
 
-  private static Executable verifyExpired() {
-    return () -> verify(VALID_TOKEN, AFTER_EXP);
+  private static Executable decodeExpired() {
+    return () -> decode(VALID_TOKEN, AFTER_EXPIRATION);
   }
 
-  private static void verify(String encoded, Instant now) {
-    TokenVerifier.builder()
+  private static void decode(String encoded, Instant now) {
+    TokenDecoder.builder()
         .host(Tokens.host())
         .clock(Clock.fixed(now, ZoneOffset.UTC))
         .build()
-        .verify(encoded, KeyPairs.correctPublic());
+        .decode(encoded, KeyPairs.correctPublic());
   }
 }

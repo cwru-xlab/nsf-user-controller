@@ -10,20 +10,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Value.Immutable
-abstract class BaseWebTokenStore extends AbstractTokenStore {
+abstract class BaseWebTokenStore extends AbstractTokenStore implements WebStore {
 
   private static final Logger logger = LoggerFactory.getLogger(WebTokenStore.class);
 
-  protected abstract WebClient client();
-
-  protected abstract String host();
-
-  public static TokenStore of(String host, WebClient client, TokenVerifier verifier) {
-    return WebTokenStore.builder().host(host).client(client).verifier(verifier).build();
+  public static TokenStore of(WebClient client, String host, TokenDecoder decoder) {
+    return WebTokenStore.builder().host(host).client(client).decoder(decoder).build();
   }
 
   @Override
-  public Future<String> getUnverified(PublicKey publicKey) {
+  public Future<String> getEncoded(PublicKey publicKey) {
     return client()
         .get(host(), "/access_token")
         .as(BodyCodec.jsonObject())

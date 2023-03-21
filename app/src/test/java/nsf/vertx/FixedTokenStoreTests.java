@@ -5,7 +5,6 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.when;
 
-import io.jsonwebtoken.security.SignatureException;
 import io.vertx.core.Future;
 import java.security.PublicKey;
 import java.time.Duration;
@@ -26,31 +25,31 @@ public class FixedTokenStoreTests {
   private static final Instant EXP = IAT.plus(Duration.ofDays(1));
   private static final Token TOKEN = Tokens.valid(IAT, EXP);
 
-  private static final Class<? extends Throwable> EXCEPTION = SignatureException.class;
+  private static final Class<? extends Throwable> EXCEPTION = TokenException.class;
 
   @Mock(stubOnly = true)
-  private TokenVerifier verifier;
+  private TokenDecoder decoder;
   private TokenStore tokenStore;
 
   @BeforeEach
   public void setUp() {
-    tokenStore = FixedTokenStore.of(TOKEN.encoded(), verifier);
+    tokenStore = FixedTokenStore.of(TOKEN.encoded(), decoder);
   }
 
   @Test
-  public void whenTokenIsVerifiedThenTokenStoreReturnsConstructorValue() {
-    whenVerifierVerifies().thenReturn(TOKEN);
+  public void whenDecodingSucceedsThenTokenStoreReturnsConstructorValue() {
+    whenDecoded().thenReturn(TOKEN);
     assertEquals(TOKEN, getToken().result());
   }
 
   @Test
-  public void whenTokenIsUnverifiedThenTokenStoreThrowsException() {
-    whenVerifierVerifies().thenThrow(EXCEPTION);
+  public void whenDecodingFailsThenTokenStoreThrowsException() {
+    whenDecoded().thenThrow(EXCEPTION);
     assertEquals(EXCEPTION, getToken().cause().getClass());
   }
 
-  private OngoingStubbing<Token> whenVerifierVerifies() {
-    return when(verifier.verify(anyString(), any(PublicKey.class)));
+  private OngoingStubbing<Token> whenDecoded() {
+    return when(decoder.decode(anyString(), any(PublicKey.class)));
   }
 
   private Future<Token> getToken() {

@@ -46,14 +46,13 @@ abstract class BaseTokenService extends AbstractVerticle {
   private Future<Void> getAndPublishToken(PublicKey publicKey) {
     return tokenStore().get(publicKey)
         .onSuccess(token -> startPeriodRefresh(token, publicKey))
-        .map(Token::encoded)
-        .flatMap(publisher()::write)
+        .onSuccess(token -> publisher().write(token.encoded()))
         .mapEmpty();
   }
 
   private void startPeriodRefresh(Token token, PublicKey publicKey) {
     if (isTimerIdNotSet()) {
-      long safeTtl = Math.round(token.ttl().toMillis() * 0.95);
+      long safeTtl = Math.round(token.timeToLive().toMillis() * 0.95);
       long timerId = getVertx().setPeriodic(safeTtl, x -> getAndPublishToken(publicKey));
       timerId().set(timerId);
     }
