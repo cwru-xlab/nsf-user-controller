@@ -3,7 +3,7 @@ package nsf.vertx.auth.token;
 import io.vertx.core.Future;
 import java.security.PublicKey;
 
-public abstract class AbstractTokenStore implements TokenStore {
+abstract class AbstractTokenStore implements TokenStore {
 
   protected abstract TokenDecoder decoder();
 

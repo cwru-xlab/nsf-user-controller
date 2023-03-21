@@ -1,4 +1,4 @@
-package nsf.vertx.auth.token;
+package nsf.vertx.auth;
 
 import io.vertx.junit5.VertxExtension;
 import java.io.IOException;
@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(VertxExtension.class)
-public class TokenServiceTests {
+public class AuthServiceTests {
 
   private static MockWebServer server;
 

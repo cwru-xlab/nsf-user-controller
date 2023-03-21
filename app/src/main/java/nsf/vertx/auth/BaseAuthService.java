@@ -1,4 +1,4 @@
-package nsf.vertx.auth.token;
+package nsf.vertx.auth;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -7,11 +7,13 @@ import io.vertx.core.eventbus.MessageProducer;
 import java.security.PublicKey;
 import java.util.concurrent.atomic.AtomicLong;
 import nsf.vertx.auth.key.PublicKeyStore;
+import nsf.vertx.auth.token.Token;
+import nsf.vertx.auth.token.TokenStore;
 import org.immutables.value.Value;
 
 @Value.Immutable
 @SuppressWarnings("immutables:incompat")
-abstract class BaseTokenService extends AbstractVerticle {
+abstract class BaseAuthService extends AbstractVerticle {
 
   private static final long UNSET_TIMER_ID = -1;
 
