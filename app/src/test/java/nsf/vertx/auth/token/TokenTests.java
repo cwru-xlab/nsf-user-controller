@@ -21,13 +21,20 @@ public class TokenTests {
   @ParameterizedTest(name = ParameterizedTest.INDEX_PLACEHOLDER + " {0}: {2}")
   @MethodSource("invalidTokens")
   @SuppressWarnings("unused")
-  public void whenInvalidTokenIsCreatedThenTimeToLiveThrowsException(String testName, Token token) {
-    assertThrowsExactly(NullPointerException.class, token::timeToLive);
+  public void whenInvalidTokenIsCreatedThenTimeToLiveThrowsException(
+      String testName, Token token, Class<? extends Throwable> thrown) {
+    assertThrowsExactly(thrown, token::timeToLive);
   }
 
   private static Stream<Arguments> invalidTokens() {
     return Stream.of(
-        Arguments.of("MissingIssuedAtClaim", Tokens.missingIssuedAtClaim(Tokens.expiresAt())),
-        Arguments.of("MissingExpiresAtClaim", Tokens.missingExpiresAtClaim(Tokens.issuedAt())));
+        Arguments.of(
+            "MissingIssuedAtClaim",
+            Tokens.missingIssuedAtClaim(Tokens.expiresAt()),
+            NullPointerException.class),
+        Arguments.of(
+            "MissingExpiresAtClaim",
+            Tokens.missingExpiresAtClaim(Tokens.issuedAt()),
+            NullPointerException.class));
   }
 }
