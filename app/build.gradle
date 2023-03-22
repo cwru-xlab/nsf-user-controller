@@ -38,6 +38,7 @@ dependencies {
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:0.11.5"
 
     implementation "io.vertx:vertx-core:4.4.0"
+    implementation "io.vertx:vertx-web:4.4.0"
     implementation "io.vertx:vertx-web-client:4.4.0"
 
     implementation "org.slf4j:slf4j-api:2.0.6"
