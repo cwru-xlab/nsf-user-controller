@@ -7,6 +7,8 @@ import org.hyperledger.aries.AriesClient;
 public class App {
 
   public static void main(String[] args) {
+    BasicConfigurator.configure();
+
     Vertx vertx = Vertx.vertx();
 
     // TODO DI everything
