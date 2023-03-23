@@ -31,6 +31,7 @@ public abstract class BaseAccessControlService {
         return client().find(collection(), query).compose(res -> {
             ArrayList<ServiceProvider> serviceProviderList = new ArrayList<>();
             for (JsonObject json : res) {
+                System.out.println(json.encode());
                 serviceProviderList.add(Json.decodeValue(json.encode(), ServiceProvider.class));
             }
             // TODO: I can't figure out how to do a Future in vert.x

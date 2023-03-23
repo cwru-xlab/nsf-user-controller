@@ -21,5 +21,6 @@ public class MongoClientVerticle extends AbstractVerticle {
         String collectionName = "access_control";
         AccessControlService accessControlService = AccessControlService.builder().client(mongoClient).collection(collectionName).build();
         accessControlService.createServiceProviderById(serviceProvider);
+        accessControlService.readServiceProviderById("serviceProviderId1");
     }
 }
