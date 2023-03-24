@@ -10,7 +10,7 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import nsf.access.BaseAccessControlService;
 import nsf.access.BaseServProvService;
-import org.hyperledger.acy_py.generated.model.SendMessage;
+import nsf.access.PushDataHandler;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.connection.ConnectionRecord;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
@@ -28,7 +28,7 @@ public class ControllerVerticle extends AbstractVerticle {
   // TODO DI
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
-  private BaseServProvService servProvService;
+  private final BaseServProvService servProvService;
 
   public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService,
                             BaseServProvService servProvService) {
@@ -50,7 +50,7 @@ public class ControllerVerticle extends AbstractVerticle {
     router.post("/service-providers/:serviceProviderId").handler(this::addServiceProviderHandler);
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 
-    router.post("/push-new-data").handler(this::pushNewData);
+    router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService));
 
     router.post("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
@@ -94,7 +94,7 @@ public class ControllerVerticle extends AbstractVerticle {
             ctx.response().setStatusCode(200).end();
           })
           .onFailure((Throwable e) -> {
-            logger.error("Failed to set policy for ServProv", e);
+            logger.error("Failed to set policy for ServProv.", e);
             ctx.response().setStatusCode(500).send(e.toString());
           });
     } catch (IOException e) {
@@ -113,34 +113,6 @@ public class ControllerVerticle extends AbstractVerticle {
     ctx.response().setStatusCode(501).end();
   }
 
-  private void pushNewData(RoutingContext ctx){
-    JsonObject newDataJson = ctx.body().asJsonObject();
-
-    try {
-      // TODO PLACEHOLDER - NEED TO READ FROM ACCESS RULES AND SEND THIS MESSAGE FOR ALL SERVPROVS THAT ARE
-      //  SUBSCRIBED TO THE RESPECTIVE NEW DATA OBJECTS:
-      for (int servprov_placeholder = 0; servprov_placeholder < 1; servprov_placeholder++){
-        JsonObject pushData = new JsonObject();
-        for (int namespace_placeholder = 0; namespace_placeholder < 1; namespace_placeholder++){
-          // TODO if servprov has access then put/include
-          String namespaceId = "subscribed-namespace-example";
-          pushData.put(namespaceId, newDataJson.getJsonObject(namespaceId));
-        }
-
-        String stringifiedPushData = pushData.toString();
-        SendMessage basicMessageResponse = SendMessage.builder()
-            .content(stringifiedPushData)
-            .build();
-        ariesClient.connectionsSendMessage("e0459d2c-7357-426c-b513-b8e87a08eab3", basicMessageResponse);
-      }
-
-      ctx.response().setStatusCode(200).end();
-    } catch (IOException e) {
-      ctx.response().setStatusCode(500).end();
-      throw new RuntimeException(e);
-    }
-  }
-
   private void setServiceProviderAccessControl(RoutingContext ctx){
     String serviceProviderId = ctx.pathParam("serviceProviderId");
 
@@ -153,7 +125,7 @@ public class ControllerVerticle extends AbstractVerticle {
           ctx.response().setStatusCode(200).end();
         })
         .onFailure((Throwable e) -> {
-          logger.error("Failed to set policy for ServProv", e);
+          logger.error("Failed to set policy for ServProv.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
   }

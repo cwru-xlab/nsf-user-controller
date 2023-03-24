@@ -1,7 +1,6 @@
 package nsf.access;
 
 import io.vertx.core.AbstractVerticle;
-import io.vertx.ext.mongo.MongoClient;
 
 public class MongoClientVerticle extends AbstractVerticle {
 
@@ -15,13 +14,13 @@ public class MongoClientVerticle extends AbstractVerticle {
     @Override
     public void start() {
 
-        MongoClient mongoClient = MongoDbHelper.getMongoClient(vertx);
-        Policy policy = Policy.builder().serviceProviderId("serviceProviderId1").version("version1").addOperation(Operation.READ).addResource("resource1").build();
-        String collectionName = "access_control";
-        AccessControlService accessControlService = AccessControlService.builder().client(mongoClient).collection(collectionName).build();
-        accessControlService.createPolicyById(policy);
-        accessControlService.readPolicyById("serviceProviderId1").onComplete(res -> {
-            System.out.println(res.result());
-        });
+//        MongoClient mongoClient = MongoDbHelper.getMongoClient(vertx);
+//        Policy policy = Policy.builder().serviceProviderId("serviceProviderId1").version("version1").addOperation(Operation.READ).addResource("resource1").build();
+//        String collectionName = "access_control";
+//        AccessControlService accessControlService = AccessControlService.builder().client(mongoClient).collection(collectionName).build();
+//        accessControlService.createPolicyById(policy);
+//        accessControlService.readPolicyById("serviceProviderId1").onComplete(res -> {
+//            System.out.println(res.result());
+//        });
     }
 }

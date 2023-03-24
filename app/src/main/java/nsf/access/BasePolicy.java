@@ -3,7 +3,7 @@ package nsf.access;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.immutables.value.Value;
 
-import java.util.List;
+import java.util.LinkedList;
 
 @Value.Immutable
 public abstract class BasePolicy {
@@ -13,8 +13,8 @@ public abstract class BasePolicy {
 
     public abstract String version();
 
-    public abstract List<Operation> operations();
+    public abstract LinkedList<Operation> operations();
 
-    public abstract List<String> resources();
+    public abstract LinkedList<String> resources();
 
 }

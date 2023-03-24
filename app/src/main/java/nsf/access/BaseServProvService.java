@@ -18,13 +18,29 @@ public abstract class BaseServProvService {
   public abstract String collection();
   public abstract MongoClient client();
 
+  // TODO SERIALIZE DESERIALIZE POJO
+
+//  public Future<List<JsonObject>> getAllServProvs(){
+//    JsonObject query = new JsonObject();
+//    return client().find(collection(), query);
+//    //.compose(documents -> {
+//    //      Promise<List<JsonObject>> promise = Promise.promise();
+//    //      promise.complete(documents);
+//    //      return promise.future();
+//    //    })
+//  }
 
   public Future<String> getServProvConnId(String servProvId){
     JsonObject query = new JsonObject()
-        .put(servProvId, new JsonObject().put("$exists", true));
+        .put("_id", servProvId);
     return client().findOne(collection(), query, null).compose(json -> {
       Promise<String> promise = Promise.promise();
-      promise.complete(json.getString("connId"));
+      if (json != null){
+        promise.complete(json.getString("connId"));
+      }
+      else{
+       promise.fail(new ServProvNotFoundException());
+      }
       return promise.future();
     });
   }
