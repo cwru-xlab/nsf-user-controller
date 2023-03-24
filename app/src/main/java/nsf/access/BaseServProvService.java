@@ -4,6 +4,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
+import io.vertx.ext.mongo.MongoClientDeleteResult;
 import org.immutables.value.Value;
 
 /**
@@ -55,4 +56,9 @@ public abstract class BaseServProvService {
     return this.client().save(this.collection(), document);
   }
 
+  public Future<MongoClientDeleteResult> deleteServProvConnMapping(String servProvId) {
+    JsonObject query = new JsonObject()
+        .put("_id", servProvId);
+    return client().removeDocument(collection(), query);
+  }
 }

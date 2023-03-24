@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -91,6 +92,7 @@ public class ControllerVerticle extends AbstractVerticle {
 
       servProvService.setServProvConnId(servProvId, acapyConnection.getConnectionId())
           .onSuccess((Void) -> {
+            logger.info("Added Service Provider ID to connection ID mapping.");
             ctx.response().setStatusCode(200).end();
           })
           .onFailure((Throwable e) -> {
@@ -109,8 +111,29 @@ public class ControllerVerticle extends AbstractVerticle {
    * access.
    */
   private void removeServiceProviderHandler(RoutingContext ctx){
-    // TODO need metastore to store service providers in (as a map from servprov IDs to conn IDs).
-    ctx.response().setStatusCode(501).end();
+    String servProvId = ctx.pathParam("serviceProviderId");
+
+    // Delete the service provider's access control policy, then delete the service provider object:
+    // NOTE on onFailure: Even if these documents don't exist in the database, they will still succeed as futures
+    //  and simply not do anything. So if a future fails here then it is unexpected.
+    accessControlService.deletePolicyById(servProvId)
+        .onSuccess((MongoClientDeleteResult deletePolicyResult) -> {
+          // Important order: the policy must be deleted before the service provider object to avoid an orphaned
+          // policy on failure.
+          servProvService.deleteServProvConnMapping(servProvId)
+              .onSuccess((MongoClientDeleteResult deleteServProvObjResult) -> {
+                logger.info("Deleted Service Provider.");
+                ctx.response().setStatusCode(200).end();
+              })
+              .onFailure((Throwable e) -> {
+                logger.error("Failed to delete Service Provider object.", e);
+                ctx.response().setStatusCode(500).send(e.toString());
+              });
+        })
+        .onFailure((Throwable e) -> {
+          logger.error("Failed to delete Service Provider Access Control Policy.", e);
+          ctx.response().setStatusCode(500).send(e.toString());
+        });
   }
 
   private void setServiceProviderAccessControl(RoutingContext ctx){
