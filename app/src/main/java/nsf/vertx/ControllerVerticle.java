@@ -4,9 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import org.hyperledger.acy_py.generated.model.SendMessage;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
 import org.hyperledger.aries.api.out_of_band.ReceiveInvitationFilter;
@@ -36,6 +38,8 @@ public class ControllerVerticle extends AbstractVerticle {
     // class if we want.
     router.post("/service-providers").handler(this::acceptServiceProviderHandler);
     router.delete("/service-providers").handler(this::removeServiceProviderHandler);
+
+    router.post("/push-new-data").handler(this::pushNewData);
 
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
@@ -80,5 +84,33 @@ public class ControllerVerticle extends AbstractVerticle {
   private void removeServiceProviderHandler(RoutingContext ctx){
     // TODO need metastore to store service providers in (as a map from servprov IDs to conn IDs).
     ctx.response().setStatusCode(501).end();
+  }
+
+  private void pushNewData(RoutingContext ctx){
+    JsonObject newDataJson = ctx.body().asJsonObject();
+
+    try {
+      // TODO PLACEHOLDER - NEED TO READ FROM ACCESS RULES AND SEND THIS MESSAGE FOR ALL SERVPROVS THAT ARE
+      //  SUBSCRIBED TO THE RESPECTIVE NEW DATA OBJECTS:
+      for (int servprov_placeholder = 0; servprov_placeholder < 1; servprov_placeholder++){
+        JsonObject pushData = new JsonObject();
+        for (int namespace_placeholder = 0; namespace_placeholder < 1; namespace_placeholder++){
+          // TODO if servprov has access then put/include
+          String namespaceId = "subscribed-namespace-example";
+          pushData.put(namespaceId, newDataJson.getJsonObject(namespaceId));
+        }
+
+        String stringifiedPushData = pushData.toString();
+        SendMessage basicMessageResponse = SendMessage.builder()
+            .content(stringifiedPushData)
+            .build();
+        ariesClient.connectionsSendMessage("e0459d2c-7357-426c-b513-b8e87a08eab3", basicMessageResponse);
+      }
+
+      ctx.response().setStatusCode(200).end();
+    } catch (IOException e) {
+      ctx.response().setStatusCode(500).end();
+      throw new RuntimeException(e);
+    }
   }
 }
