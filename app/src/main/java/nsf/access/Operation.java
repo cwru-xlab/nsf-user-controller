@@ -3,9 +3,12 @@ package nsf.access;
 import java.util.Locale;
 
 public enum Operation {
-
-    PUT,
+    /**
+     * Lets ServiceProviders automatically get pushed new data for the resources they are subscribed to.
+     */
+    SUBSCRIBE,
     READ,
+    PUT,
     DELETE;
 
     @Override

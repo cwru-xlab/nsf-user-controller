@@ -1,4 +1,4 @@
-package nsf.vertx;
+package nsf.controller;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -8,6 +8,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import nsf.access.BaseAccessControlService;
 import org.hyperledger.acy_py.generated.model.SendMessage;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
@@ -23,15 +24,19 @@ public class ControllerVerticle extends AbstractVerticle {
 
   // TODO DI
   private final AriesClient ariesClient;
+  private final BaseAccessControlService accessControlService;
 
-  public ControllerVerticle(AriesClient ariesClient) {
+  public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService) {
     this.ariesClient = ariesClient;
+    this.accessControlService = accessControlService;
   }
 
   @Override
   public void start(Promise<Void> promise) {
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
+
+    // TODO Refactor split up into multiple handler files.
 
     // NOTE: normally you make separate Handler classes for the handlers functions, but these service provider ones
     // are so simple that we should probably just make them actual functions, maybe grouped in their own controller
@@ -40,6 +45,8 @@ public class ControllerVerticle extends AbstractVerticle {
     router.delete("/service-providers").handler(this::removeServiceProviderHandler);
 
     router.post("/push-new-data").handler(this::pushNewData);
+
+    router.post("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
@@ -112,5 +119,22 @@ public class ControllerVerticle extends AbstractVerticle {
       ctx.response().setStatusCode(500).end();
       throw new RuntimeException(e);
     }
+  }
+
+  private void setServiceProviderAccessControl(RoutingContext ctx){
+    String serviceProviderId = ctx.pathParam("serviceProviderId");
+
+    JsonObject product = ctx.body().asJsonObject();
+    PolicyModel policyModel = product.mapTo(PolicyModel.class);
+
+    accessControlService.createPolicyById(policyModel.toEntity(serviceProviderId))
+        .onSuccess((String nullableResponse) -> {
+          logger.info("Updated policy for ServProv: " + serviceProviderId);
+          ctx.response().setStatusCode(200).end();
+        })
+        .onFailure((Throwable err) -> {
+          logger.error("Failed to set policy for ServProv", err);
+          ctx.response().setStatusCode(500).send(err.toString());
+        });
   }
 }

@@ -1,7 +1,6 @@
 package nsf.access;
 
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.json.Json;
 import io.vertx.ext.mongo.MongoClient;
 
 public class MongoClientVerticle extends AbstractVerticle {
@@ -14,7 +13,7 @@ public class MongoClientVerticle extends AbstractVerticle {
     }
 
     @Override
-    public void start() throws Exception {
+    public void start() {
 
         MongoClient mongoClient = MongoDbHelper.getMongoClient(vertx);
         Policy policy = Policy.builder().serviceProviderId("serviceProviderId1").version("version1").addOperation(Operation.READ).addResource("resource1").build();
