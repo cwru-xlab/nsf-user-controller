@@ -1,10 +1,9 @@
 package nsf.vertx;
 
+import io.vertx.core.Context;
 import io.vertx.core.Vertx;
 import io.vertx.ext.mongo.MongoClient;
-import nsf.access.AccessControlService;
-import nsf.access.BaseAccessControlService;
-import nsf.access.MongoDbHelper;
+import nsf.access.*;
 import nsf.controller.ControllerVerticle;
 import org.apache.log4j.BasicConfigurator;
 import org.hyperledger.aries.AriesClient;
@@ -24,9 +23,19 @@ public class App {
         //.apiKey("secret") // TODO AUTH (low priority)
         .build();
 
-    MongoClient mongoClient = MongoDbHelper.getMongoClient(vertx);
-    BaseAccessControlService accessControlService =
-        AccessControlService.builder().client(mongoClient).collection("access_control").build();
-    vertx.deployVerticle(new ControllerVerticle(ariesClient, accessControlService));
+
+    Context context = vertx.getOrCreateContext();
+    context.runOnContext(v -> {
+      MongoClient mongoClient = MongoDbHelper.getMongoClient(vertx);
+
+      BaseAccessControlService accessControlService =
+          AccessControlService.builder().client(mongoClient).collection("access_control").build();
+
+      BaseServProvService servProvService =
+          ServProvService.builder().client(mongoClient).collection("service_providers").build();
+
+      vertx.deployVerticle(new ControllerVerticle(ariesClient, accessControlService, servProvService));
+    });
+
   }
 }

@@ -9,8 +9,10 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import nsf.access.BaseAccessControlService;
+import nsf.access.BaseServProvService;
 import org.hyperledger.acy_py.generated.model.SendMessage;
 import org.hyperledger.aries.AriesClient;
+import org.hyperledger.aries.api.connection.ConnectionRecord;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
 import org.hyperledger.aries.api.out_of_band.ReceiveInvitationFilter;
 import org.slf4j.Logger;
@@ -18,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.util.Optional;
 
 public class ControllerVerticle extends AbstractVerticle {
   private static final Logger logger = LoggerFactory.getLogger(ControllerVerticle.class);
@@ -25,10 +28,13 @@ public class ControllerVerticle extends AbstractVerticle {
   // TODO DI
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
+  private BaseServProvService servProvService;
 
-  public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService) {
+  public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService,
+                            BaseServProvService servProvService) {
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
+    this.servProvService = servProvService;
   }
 
   @Override
@@ -41,8 +47,8 @@ public class ControllerVerticle extends AbstractVerticle {
     // NOTE: normally you make separate Handler classes for the handlers functions, but these service provider ones
     // are so simple that we should probably just make them actual functions, maybe grouped in their own controller
     // class if we want.
-    router.post("/service-providers").handler(this::acceptServiceProviderHandler);
-    router.delete("/service-providers").handler(this::removeServiceProviderHandler);
+    router.post("/service-providers/:serviceProviderId").handler(this::addServiceProviderHandler);
+    router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 
     router.post("/push-new-data").handler(this::pushNewData);
 
@@ -66,19 +72,33 @@ public class ControllerVerticle extends AbstractVerticle {
 
   /**
    * Handles post request for establishing a connection to a service provider given an invitation message JSON from
-   * that service provider in the post body.
+   * that service provider in the post body. This tells the ACA-Py agent that we have "received" the invitation
+   * message, and progresses the state of the connection.
    */
-  private void acceptServiceProviderHandler(RoutingContext ctx){
+  private void addServiceProviderHandler(RoutingContext ctx){
     // Deserialize Vertx body via Gson (since ACA-Py wrapper takes Gson-serializable InvitationMessage):
+    String servProvId = ctx.pathParam("serviceProviderId");
     String invitationMsgStr = ctx.body().asString();
+
     Type type = new TypeToken<InvitationMessage<Object>>(){}.getType();
     InvitationMessage<Object> invitationMsg = new Gson().fromJson(invitationMsgStr, type);
 
     try {
-      ariesClient.outOfBandReceiveInvitation(invitationMsg,
+      Optional<ConnectionRecord> returnedAcapyConnection = ariesClient.outOfBandReceiveInvitation(invitationMsg,
           ReceiveInvitationFilter.builder().build());
-      ctx.response().setStatusCode(200).end();
+      ConnectionRecord acapyConnection = returnedAcapyConnection.orElseThrow(() -> new IOException("Did not get an " +
+          "ACA-Py connection."));
+
+      servProvService.setServProvConnId(servProvId, acapyConnection.getConnectionId())
+          .onSuccess((Void) -> {
+            ctx.response().setStatusCode(200).end();
+          })
+          .onFailure((Throwable e) -> {
+            logger.error("Failed to set policy for ServProv", e);
+            ctx.response().setStatusCode(500).send(e.toString());
+          });
     } catch (IOException e) {
+      logger.error("Failed to add Service Provider.", e);
       ctx.response().setStatusCode(500).end();
       throw new RuntimeException(e);
     }
@@ -132,9 +152,9 @@ public class ControllerVerticle extends AbstractVerticle {
           logger.info("Updated policy for ServProv: " + serviceProviderId);
           ctx.response().setStatusCode(200).end();
         })
-        .onFailure((Throwable err) -> {
-          logger.error("Failed to set policy for ServProv", err);
-          ctx.response().setStatusCode(500).send(err.toString());
+        .onFailure((Throwable e) -> {
+          logger.error("Failed to set policy for ServProv", e);
+          ctx.response().setStatusCode(500).send(e.toString());
         });
   }
 }
