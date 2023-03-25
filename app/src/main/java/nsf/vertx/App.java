@@ -6,12 +6,15 @@ import io.vertx.ext.mongo.MongoClient;
 import nsf.access.*;
 import nsf.controller.ControllerVerticle;
 import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.hyperledger.aries.AriesClient;
 
 public class App {
 
   public static void main(String[] args) {
     BasicConfigurator.configure();
+    Logger.getRootLogger().setLevel(Level.INFO);
 
     Vertx vertx = Vertx.vertx();
 
@@ -19,7 +22,7 @@ public class App {
 
     AriesClient ariesClient = AriesClient
         .builder()
-        .url("http://localhost:8031")
+        .url("http://host.docker.internal:8031")
         //.apiKey("secret") // TODO AUTH (low priority)
         .build();
 
