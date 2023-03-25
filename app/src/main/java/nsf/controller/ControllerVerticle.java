@@ -53,7 +53,7 @@ public class ControllerVerticle extends AbstractVerticle {
 
     router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService));
 
-    router.post("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
+    router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
@@ -131,25 +131,44 @@ public class ControllerVerticle extends AbstractVerticle {
               });
         })
         .onFailure((Throwable e) -> {
-          logger.error("Failed to delete Service Provider Access Control Policy.", e);
+          logger.error("Failed to delete Service Provider access control policy.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
   }
 
+  /**
+   * REMARK: Currently access control is quite limited and does not allow fine-grain per-resource access control, as
+   * the access rules of a single service provider are currently defined by independent
+   */
   private void setServiceProviderAccessControl(RoutingContext ctx){
     String serviceProviderId = ctx.pathParam("serviceProviderId");
 
     JsonObject product = ctx.body().asJsonObject();
     PolicyModel policyModel = product.mapTo(PolicyModel.class);
 
-    accessControlService.createPolicyById(policyModel.toEntity(serviceProviderId))
-        .onSuccess((String nullableResponse) -> {
-          logger.info("Updated policy for ServProv: " + serviceProviderId);
-          ctx.response().setStatusCode(200).end();
+    servProvService.getServProv(serviceProviderId)
+        .onSuccess((Optional<JsonObject> nullableJsonObj) -> {
+          if (nullableJsonObj.isPresent()){
+            accessControlService.createPolicyById(policyModel.toEntity(serviceProviderId))
+                .onSuccess((String nullableResponse) -> {
+                  logger.info("Updated policy for ServProv: " + serviceProviderId);
+                  ctx.response().setStatusCode(200).end();
+                })
+                .onFailure((Throwable e) -> {
+                  logger.error("Failed to set policy for ServProv.", e);
+                  ctx.response().setStatusCode(500).send(e.toString());
+                });
+          }
+          else{
+            ctx.response().setStatusCode(400).send("Service Provider not found. Make sure you have added the Service " +
+                "Provider.");
+          }
         })
-        .onFailure((Throwable e) -> {
-          logger.error("Failed to set policy for ServProv.", e);
+        .onFailure((Throwable e) ->{
+          logger.error("Failed to set access control policy.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
+
+
   }
 }

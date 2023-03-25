@@ -7,6 +7,8 @@ import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import org.immutables.value.Value;
 
+import java.util.Optional;
+
 /**
  * Service/repository for mediating access to persistent Service Provider mappings between the controller and database.
  * "Service Provider mapping" refers to how we map custom given Service Provider IDs to corresponding ACA-Py
@@ -31,17 +33,26 @@ public abstract class BaseServProvService {
 //    //    })
 //  }
 
+  // TODO REFACTOR USE COMMON GUARD FUNC AND ALSO EVENTUALLY REFACTOR INTO POJO
   public Future<String> getServProvConnId(String servProvId){
-    JsonObject query = new JsonObject()
-        .put("_id", servProvId);
-    return client().findOne(collection(), query, null).compose(json -> {
+    return getServProv(servProvId).compose(json -> {
       Promise<String> promise = Promise.promise();
-      if (json != null){
-        promise.complete(json.getString("connId"));
+      if (json.isPresent()){
+        promise.complete(json.get().getString("connId"));
       }
       else{
        promise.fail(new ServProvNotFoundException());
       }
+      return promise.future();
+    });
+  }
+
+  public Future<Optional<JsonObject>> getServProv(String servProvId){
+    JsonObject query = new JsonObject()
+        .put("_id", servProvId);
+    return client().findOne(collection(), query, null).compose(json -> {
+      Promise<Optional<JsonObject>> promise = Promise.promise();
+      promise.complete(Optional.ofNullable(json));
       return promise.future();
     });
   }
