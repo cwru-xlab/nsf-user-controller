@@ -115,20 +115,35 @@ public class ControllerVerticle extends AbstractVerticle {
   private void removeServiceProviderHandler(RoutingContext ctx){
     String servProvId = ctx.pathParam("serviceProviderId");
 
+    // TODO REFACTOR 💀
     // Delete the service provider's access control policy, then delete the service provider object:
     // NOTE on onFailure: Even if these documents don't exist in the database, they will still succeed as futures
     //  and simply not do anything. So if a future fails here then it is unexpected.
     accessControlService.deletePolicyById(servProvId)
         .onSuccess((MongoClientDeleteResult deletePolicyResult) -> {
-          // Important order: the policy must be deleted before the service provider object to avoid an orphaned
-          // policy on failure.
-          servProvService.deleteServProvConnMapping(servProvId)
-              .onSuccess((MongoClientDeleteResult deleteServProvObjResult) -> {
-                logger.info("Deleted Service Provider.");
-                ctx.response().setStatusCode(200).end();
+          servProvService.getServProvConnId(servProvId)
+              .onSuccess((String connId) -> {
+                // Important order: the policy must be deleted before the service provider object to avoid an orphaned
+                // policy on failure.
+                servProvService.deleteServProvConnMapping(servProvId)
+                    .onSuccess((MongoClientDeleteResult deleteServProvObjResult) -> {
+                      try {
+                        ariesClient.connectionsRemove(connId);
+                      } catch (IOException e) {
+                        logger.error("Failed to remove Service Provider connection.", e);
+                        ctx.response().setStatusCode(500).end();
+                        throw new RuntimeException(e);
+                      }
+                      logger.info("Deleted Service Provider.");
+                      ctx.response().setStatusCode(200).end();
+                    })
+                    .onFailure((Throwable e) -> {
+                      logger.error("Failed to delete Service Provider object.", e);
+                      ctx.response().setStatusCode(500).send(e.toString());
+                    });
               })
               .onFailure((Throwable e) -> {
-                logger.error("Failed to delete Service Provider object.", e);
+                logger.error("Failed to get Service Provider object.", e);
                 ctx.response().setStatusCode(500).send(e.toString());
               });
         })
@@ -136,7 +151,6 @@ public class ControllerVerticle extends AbstractVerticle {
           logger.error("Failed to delete Service Provider access control policy.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
-    // TODO DELETE ACAPY CONN
   }
 
   /**
