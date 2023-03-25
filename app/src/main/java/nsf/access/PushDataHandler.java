@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class PushDataHandler implements Handler<RoutingContext> {
@@ -21,11 +22,13 @@ public class PushDataHandler implements Handler<RoutingContext> {
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
   private final BaseServProvService servProvService;
+  private final Function<JsonObject,JsonObject> pushableDataTransformer;
 
-  public PushDataHandler(AriesClient ariesClient, BaseAccessControlService accessControlService, BaseServProvService servProvService){
+  public PushDataHandler(AriesClient ariesClient, BaseAccessControlService accessControlService, BaseServProvService servProvService, Function<JsonObject, JsonObject> pushableDataTransformer){
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
     this.servProvService = servProvService;
+    this.pushableDataTransformer = pushableDataTransformer;
   }
 
   @Override
@@ -34,8 +37,10 @@ public class PushDataHandler implements Handler<RoutingContext> {
 
     accessControlService.readAllSubscribePolicies()
         .onSuccess(policies -> {
+          // Transform the incoming data into the data that will actually be pushed:
+          JsonObject finalPushData = pushableDataTransformer.apply(newDataJson);
           // Push to Service Providers:
-          List<Future<String>> pushFutures = pushToServProvs(newDataJson, policies);
+          List<Future<String>> pushFutures = pushToServProvs(finalPushData, policies);
 
           // Wait till pushed to all Service Providers, then respond with the respective result messages:
           CompositeFuture.all(new ArrayList<>(pushFutures))

@@ -12,6 +12,7 @@ import io.vertx.ext.web.handler.BodyHandler;
 import nsf.access.BaseAccessControlService;
 import nsf.access.BaseServProvService;
 import nsf.access.PushDataHandler;
+import nsf.access.PushDataTransformer;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.connection.ConnectionRecord;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
@@ -51,7 +52,8 @@ public class ControllerVerticle extends AbstractVerticle {
     router.post("/service-providers/:serviceProviderId").handler(this::addServiceProviderHandler);
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 
-    router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService));
+    router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
+        PushDataTransformer::transformPushableData));
 
     router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
@@ -134,6 +136,7 @@ public class ControllerVerticle extends AbstractVerticle {
           logger.error("Failed to delete Service Provider access control policy.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
+    // TODO DELETE ACAPY CONN
   }
 
   /**
@@ -168,7 +171,5 @@ public class ControllerVerticle extends AbstractVerticle {
           logger.error("Failed to set access control policy.", e);
           ctx.response().setStatusCode(500).send(e.toString());
         });
-
-
   }
 }
