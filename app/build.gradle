@@ -31,7 +31,7 @@ repositories {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(16)
     }
 }
 
@@ -69,12 +69,8 @@ dependencies {
     testRuntimeOnly "io.jsonwebtoken:jjwt-jackson:0.11.5"
 }
 
-testing {
-    suites {
-        test {
-            useJUnitJupiter("5.9.1")
-        }
-    }
+test {
+    useJUnitPlatform()
 }
 
 application {
