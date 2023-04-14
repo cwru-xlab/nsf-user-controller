@@ -37,7 +37,10 @@ public class App {
       BaseServProvService servProvService =
           ServProvService.builder().client(mongoClient).collection("service_providers").build();
 
-      vertx.deployVerticle(new ControllerVerticle(ariesClient, accessControlService, servProvService));
+      BaseDataService dataService =
+          DataService.builder().client(mongoClient).build();
+
+      vertx.deployVerticle(new ControllerVerticle(ariesClient, accessControlService, servProvService, dataService));
     });
 
   }

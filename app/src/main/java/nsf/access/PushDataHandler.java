@@ -22,12 +22,16 @@ public class PushDataHandler implements Handler<RoutingContext> {
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
   private final BaseServProvService servProvService;
+  private final BaseDataService dataService;
   private final Function<JsonObject,JsonObject> pushableDataTransformer;
 
-  public PushDataHandler(AriesClient ariesClient, BaseAccessControlService accessControlService, BaseServProvService servProvService, Function<JsonObject, JsonObject> pushableDataTransformer){
+  public PushDataHandler(AriesClient ariesClient, BaseAccessControlService accessControlService,
+                         BaseServProvService servProvService, BaseDataService dataService, Function<JsonObject,
+                         JsonObject> pushableDataTransformer){
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
     this.servProvService = servProvService;
+    this.dataService = dataService;
     this.pushableDataTransformer = pushableDataTransformer;
   }
 
@@ -35,47 +39,49 @@ public class PushDataHandler implements Handler<RoutingContext> {
   public void handle(RoutingContext ctx) {
     JsonObject newDataJson = ctx.body().asJsonObject();
 
-    accessControlService.readAllSubscribePolicies()
-        .onSuccess(policies -> {
-          // Transform the incoming data into the data that will actually be pushed:
-          JsonObject finalPushData = pushableDataTransformer.apply(newDataJson);
-          // Push to Service Providers:
-          List<Future<String>> pushFutures = pushToServProvs(finalPushData, policies);
+    dataService.addData(newDataJson).onSuccess(discard -> {
+      // TODO refactor
+      accessControlService.readAllSubscribePolicies()
+          .onSuccess(policies -> {
+            // Transform the incoming data into the data that will actually be pushed:
+            JsonObject finalPushData = pushableDataTransformer.apply(newDataJson);
+            // Push to Service Providers:
+            List<Future<String>> pushFutures = pushToServProvs(finalPushData, policies);
 
-          // Wait till pushed to all Service Providers, then respond with the respective result messages:
-          CompositeFuture.all(new ArrayList<>(pushFutures))
-              .onSuccess((compositeFuture) -> {
-                // Map each result message to a line on the response body:
-                List<String> resultMsgs = pushFutures.stream().map(Future::result).collect(Collectors.toList());
-                String combinedResultMsgs = String.join("\n", resultMsgs);
+            // Wait till pushed to all Service Providers, then respond with the respective result messages:
+            CompositeFuture.all(new ArrayList<>(pushFutures))
+                .onSuccess((compositeFuture) -> {
+                  // Map each result message to a line on the response body:
+                  List<String> resultMsgs = pushFutures.stream().map(Future::result).collect(Collectors.toList());
+                  String combinedResultMsgs = String.join("\n", resultMsgs);
 
-                logger.info("Pushed new data (%s pushes) :\n%s".formatted(resultMsgs.size(), combinedResultMsgs));
+                  logger.info("Pushed new data (%s pushes):\n%s".formatted(resultMsgs.size(), combinedResultMsgs));
 
-                // Respond:
-                if (resultMsgs.size() > 0){
-                  ctx.response().setStatusCode(200).send("Pushed new data:\n " + combinedResultMsgs);
-                }
-                else{
-                  ctx.response().setStatusCode(200).send("Pushed no data, as no Service Providers were subscribed to " +
-                      "any of the pushed resources.");
-                }
-              })
-              .onFailure((Throwable e) -> {
-                logger.error("Failed to push new data.", e);
-                ctx.response().setStatusCode(500).send("Failed to push new data because the following exception " +
-                    "occurred during a push to a Service Provider: " + e);
-              });
-        })
-        .onFailure((Throwable e) -> {
-          logger.error("Failed to read access control subscribe policies.", e);
-          ctx.response().setStatusCode(500).send("Failed to push because failed to read access control " +
-              "subscribe policies: " + e);
-        });
+                  // Respond:
+                  if (resultMsgs.size() > 0){
+                    ctx.response().setStatusCode(200).send("Pushed new data:\n " + combinedResultMsgs);
+                  }
+                  else{
+                    ctx.response().setStatusCode(200).send("Pushed no data, as no Service Providers were subscribed to " +
+                        "any of the pushed resources.");
+                  }
+                })
+                .onFailure((Throwable e) -> {
+                  logger.error("Failed to push new data.", e);
+                  ctx.response().setStatusCode(500).send("Failed to push new data because the following exception " +
+                      "occurred during a push to a Service Provider: " + e);
+                });
+          })
+          .onFailure((Throwable e) -> {
+            logger.error("Failed to read access control subscribe policies.", e);
+            ctx.response().setStatusCode(500).send("Failed to push because failed to read access control " +
+                "subscribe policies: " + e);
+          });
+    });
   }
 
   /**
    * Pushes the given JSON resources (which include all the data in those resources) according to the given policies.
-   * Returned Future list is
    * @param pushableJsonResources a JSON object where each child key-value represents a resource and that resource's
    *                              data respectively.
    * @param policies the considered policies that say which Service Providers are subscribed to which resources.
@@ -97,7 +103,7 @@ public class PushDataHandler implements Handler<RoutingContext> {
       // Turn the resources into a JSON data body:
       JsonObject servProvPushData = new JsonObject();
       for (String resource : subscribedResources)
-        servProvPushData.put(resource, pushableJsonResources.getJsonObject(resource));
+        servProvPushData.put(resource, pushableJsonResources.getJsonArray(resource));
 
       // Future push the JSON data and give a result message:
       Future<String> sendMessageFuture = pushDataToServProv(servProvPushData, servProvId)

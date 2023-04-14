@@ -9,10 +9,7 @@ import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
-import nsf.access.BaseAccessControlService;
-import nsf.access.BaseServProvService;
-import nsf.access.PushDataHandler;
-import nsf.access.PushDataTransformer;
+import nsf.access.*;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.connection.ConnectionRecord;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
@@ -31,12 +28,14 @@ public class ControllerVerticle extends AbstractVerticle {
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
   private final BaseServProvService servProvService;
+  private final BaseDataService dataService;
 
   public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService,
-                            BaseServProvService servProvService) {
+                            BaseServProvService servProvService, BaseDataService dataService) {
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
     this.servProvService = servProvService;
+    this.dataService = dataService;
   }
 
   @Override
@@ -52,10 +51,11 @@ public class ControllerVerticle extends AbstractVerticle {
     router.post("/service-providers/:serviceProviderId").handler(this::addServiceProviderHandler);
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 
-    router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
-        PushDataTransformer::transformPushableData));
-
     router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
+
+    router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
+        dataService, PushDataTransformer::transformPushableData));
+
 
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
