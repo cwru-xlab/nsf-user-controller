@@ -56,6 +56,7 @@ public class ControllerVerticle extends AbstractVerticle {
     router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
         dataService, PushDataTransformer::transformPushableData));
 
+    router.get("/get-data").handler(new GetDataHandler(dataService));
 
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));

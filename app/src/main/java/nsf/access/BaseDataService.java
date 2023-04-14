@@ -18,21 +18,17 @@ import java.util.function.Function;
 @Value.Immutable
 public abstract class BaseDataService {
   private static final Logger logger = LoggerFactory.getLogger(BaseDataService.class);
-  public static final String collectionPrefix = "data.";
+  public static String namespaceToCollection(String namespace){
+    return "data." + namespace;
+  }
   public abstract MongoClient client();
 
   /**
-   * Reads all policies that are subscribed (have the {@link Operation#SUBSCRIBE} operation).
+   * Reads previously-stored data of a specific namespace.
    */
-  public Future<List<Policy>> readAllSubscribePolicies(){
-//    JsonObject query = new JsonObject()
-//        .put("operations", new JsonObject().put("$in", new JsonArray().add("SUBSCRIBE")));
-//    return client().find(collection(), query).compose(documents -> {
-//      Promise<List<Policy>> promise = Promise.promise();
-//      promise.complete(documents.stream().map(document -> document.mapTo(Policy.class)).collect(Collectors.toList()));
-//      return promise.future();
-//    });
-    return null;
+  public Future<List<JsonObject>> readNamespaceData(String namespace){
+    JsonObject query = new JsonObject();
+    return client().find(namespaceToCollection(namespace), query);
   }
 
   /**
@@ -62,7 +58,7 @@ public abstract class BaseDataService {
    */
   private Future<MongoClientBulkWriteResult> addJsonItemsToNamespace(String namespace, Object newData,
                                                                 Function<String, Boolean> collectionExistsChecker){
-    String namespaceCollection = collectionPrefix + namespace;
+    String namespaceCollection = namespaceToCollection(namespace);
     // If the collection already exists, then just add the new data to it:
     if (collectionExistsChecker.apply(namespaceCollection)){
       return addJsonItemsToCollection(namespaceCollection, newData);
