@@ -1,4 +1,4 @@
-FROM gradle:8.0.2-jdk17-alpine AS build
+FROM gradle:7.1.0-jdk16 AS build
 COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src
 
@@ -6,9 +6,8 @@ WORKDIR /home/gradle/src
 RUN gradle shadowJar 
 
 
-FROM openjdk:17-oracle
+FROM openjdk:16-oracle
 
-# TODO REMOVE THIS SHIT ---!!!!!!!!!!
 RUN mkdir /app
 
 # Copy over the fat JAR:
