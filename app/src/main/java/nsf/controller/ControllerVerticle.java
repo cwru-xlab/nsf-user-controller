@@ -2,6 +2,7 @@ package nsf.controller;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
@@ -19,6 +20,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 
 public class ControllerVerticle extends AbstractVerticle {
@@ -82,10 +86,19 @@ public class ControllerVerticle extends AbstractVerticle {
   private void addServiceProviderHandler(RoutingContext ctx){
     // Deserialize Vertx body via Gson (since ACA-Py wrapper takes Gson-serializable InvitationMessage):
     String servProvId = ctx.pathParam("serviceProviderId");
-    String invitationMsgStr = ctx.body().asString();
+    String invitationMsgUrl = ctx.body().asString();
+    QueryStringDecoder queryStringDecoder = new QueryStringDecoder(invitationMsgUrl);
+    List<String> oobQueryParams = queryStringDecoder.parameters().get("oob");
+    if (oobQueryParams == null & oobQueryParams.size() != 0){
+      logger.error("Failed to find the single 'oob' query parameter in invitation URL");
+      return;
+    }
+    String invitationJsonBase64 = oobQueryParams.get(0);
+    byte[] invitationMsgBytes = Base64.getDecoder().decode(invitationJsonBase64);
+    String invitationMsgJsonStr = new String(invitationMsgBytes, StandardCharsets.UTF_8);
 
     Type type = new TypeToken<InvitationMessage<Object>>(){}.getType();
-    InvitationMessage<Object> invitationMsg = new Gson().fromJson(invitationMsgStr, type);
+    InvitationMessage<Object> invitationMsg = new Gson().fromJson(invitationMsgJsonStr, type);
 
     try {
       Optional<ConnectionRecord> returnedAcapyConnection = ariesClient.outOfBandReceiveInvitation(invitationMsg,
