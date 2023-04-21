@@ -102,7 +102,7 @@ public class ControllerVerticle extends AbstractVerticle {
 
     try {
       Optional<ConnectionRecord> returnedAcapyConnection = ariesClient.outOfBandReceiveInvitation(invitationMsg,
-          ReceiveInvitationFilter.builder().build());
+          ReceiveInvitationFilter.builder().autoAccept(true).build());
       ConnectionRecord acapyConnection = returnedAcapyConnection.orElseThrow(() -> new IOException("Did not get an " +
           "ACA-Py connection."));
 
