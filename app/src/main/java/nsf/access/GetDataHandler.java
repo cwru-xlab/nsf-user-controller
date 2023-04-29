@@ -26,7 +26,19 @@ public class GetDataHandler implements Handler<RoutingContext> {
     JsonObject responseData = new JsonObject();
     List<Future> readFutures = new ArrayList<>();
 
-    JsonObject requestedGetNamespaces = ctx.body().asJsonObject();
+    JsonObject requestedGetNamespaces;
+    try{
+      requestedGetNamespaces = ctx.body().asJsonObject();
+    }
+    catch (Exception e){
+      ctx.response().setStatusCode(400).end();
+      throw e;
+    }
+    if (requestedGetNamespaces == null){
+      ctx.response().setStatusCode(400).end();
+      return;
+    }
+
     for (String namespace : requestedGetNamespaces.fieldNames()){
       readFutures.add(dataService.readNamespaceData(namespace).onSuccess(data -> {
         JsonArray namespaceDataArray = new JsonArray(data);
