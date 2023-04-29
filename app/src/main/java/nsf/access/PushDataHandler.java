@@ -55,7 +55,7 @@ public class PushDataHandler implements Handler<RoutingContext> {
                   List<String> resultMsgs = pushFutures.stream().map(Future::result).collect(Collectors.toList());
                   String combinedResultMsgs = String.join("\n", resultMsgs);
 
-                  logger.info("Pushed new data (%s pushes):\n%s".formatted(resultMsgs.size(), combinedResultMsgs));
+                  logger.info("Pushed new data ({} pushes):\n{}", resultMsgs.size(), combinedResultMsgs);
 
                   // Respond:
                   if (resultMsgs.size() > 0){

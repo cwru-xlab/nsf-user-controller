@@ -38,7 +38,13 @@ abstract class BaseWebPublicKeyStore implements PublicKeyStore, WebStore {
         .log();
   }
 
-  private record Rsa256PublicKey(byte[] encoded) implements PublicKey {
+  private static final class Rsa256PublicKey implements PublicKey {
+
+    private final byte[] encoded;
+
+    private Rsa256PublicKey(byte[] encoded) {
+      this.encoded = encoded;
+    }
 
     public static PublicKey from(Buffer buffer) {
       return new Rsa256PublicKey(buffer.getBytes());
