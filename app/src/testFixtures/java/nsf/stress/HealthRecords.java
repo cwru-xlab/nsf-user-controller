@@ -34,6 +34,106 @@ public final class HealthRecords {
   private HealthRecords() {
   }
 
+  public static HealthRecord.Builder builderWithInfiniteAverageSpeed() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(Double.POSITIVE_INFINITY)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithInfiniteExpenditure() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(Double.POSITIVE_INFINITY)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNaNAverageSpeed() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(Double.NaN)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNaNExpenditure() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(Double.NaN)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeActiveDuration() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION.negated())
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeAverageSpeed() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(-AVERAGE_SPEED)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeExpenditure() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(-EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeHeartRates() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(-AVERAGE_SPEED)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(new TreeMap<>(Map.of(HR_TIME, -1)))
+        .sleepDuration(SLEEP_DURATION)
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeSleepDuration() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION.negated())
+        .stepCount(STEP_COUNT);
+  }
+
+  public static HealthRecord.Builder builderWithNegativeStepCount() {
+    return HealthRecord.builder()
+        .activeDuration(ACTIVE_DURATION)
+        .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
+        .expenditureInKilocalories(EXPENDITURE)
+        .heartRatesInBeatsPerMinute(HR_TREE_MAP)
+        .sleepDuration(SLEEP_DURATION.negated())
+        .stepCount(-STEP_COUNT);
+  }
+
   public static HealthRecord.Builder builderWithMissingActiveDuration() {
     return HealthRecord.builder()
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)

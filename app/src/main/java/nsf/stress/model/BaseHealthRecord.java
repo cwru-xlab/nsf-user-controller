@@ -12,15 +12,20 @@ abstract class BaseHealthRecord {
 
   public abstract Duration activeDuration();
 
-  public abstract double expenditureInKilocalories();
-
-  public abstract long stepCount();
-
   public abstract double averageSpeedInKilometersPerHour();
+
+  public abstract double expenditureInKilocalories();
 
   public abstract NavigableMap<Instant, Integer> heartRatesInBeatsPerMinute();
 
   public abstract Duration sleepDuration();
+
+  public abstract long stepCount();
+
+  @Value.Derived
+  public double averageHeartRate() {
+    return heartRates().average().orElse(0d);
+  }
 
   @Value.Derived
   public double averageHeartRateReserve() {
@@ -32,11 +37,6 @@ abstract class BaseHealthRecord {
     return heartRates().max().orElse(0);
   }
 
-  @Value.Derived
-  public double averageHeartRate() {
-    return heartRates().average().orElse(0d);
-  }
-
   public double percentHeartRatesAbove(int beatsPerMinute) {
     double nAbove = heartRates().filter(bpm -> bpm > beatsPerMinute).count();
     return safeDivide(nAbove, heartRatesInBeatsPerMinute().size());
@@ -45,10 +45,10 @@ abstract class BaseHealthRecord {
   @Value.Check
   protected void check() {
     checkIsFiniteNonNegative(activeDuration().getSeconds(), "activeDuration");
-    checkIsFiniteNonNegative(expenditureInKilocalories(), "expenditureInKilocalories");
-    checkIsFiniteNonNegative(stepCount(), "stepCount");
     checkIsFiniteNonNegative(averageSpeedInKilometersPerHour(), "averageSpeedInKilometersPerHour");
+    checkIsFiniteNonNegative(expenditureInKilocalories(), "expenditureInKilocalories");
     checkIsFiniteNonNegative(sleepDuration().getSeconds(), "sleepDuration");
+    checkIsFiniteNonNegative(stepCount(), "stepCount");
     heartRatesInBeatsPerMinute().values().forEach(hr -> checkIsFiniteNonNegative(hr, "heartRate"));
   }
 
@@ -62,6 +62,7 @@ abstract class BaseHealthRecord {
 
   private static void checkIsFiniteNonNegative(double value, String name) {
     boolean isValid = Double.isFinite(value) && value >= 0d;
-    Preconditions.checkState(isValid, "\"%s\" must be finite and non-negative; got %s", name, value);
+    Preconditions.checkState(
+        isValid, "\"%s\" must be finite and non-negative; got %s", name, value);
   }
 }
