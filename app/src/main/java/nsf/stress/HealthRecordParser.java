@@ -28,7 +28,6 @@ public final class HealthRecordParser {
    * <ul>
    *   <li><b>activeDuration</b>: activityData.summary.durations.active_seconds</li>
    *   <li><b>expenditureInKilocalories</b>: activityData.summary.energy_expenditure.active_kcal</li>
-   *   <li><b>distanceInMeters</b>: activityData.summary.movement.distance_meters</li>
    *   <li><b>stepCount</b>: activityData.summary.movement.step_count</li>
    *   <li><b>averageSpeedInKilometersPerHour</b>: activityData.summary.movement.speed.avg_km_h</li>
    *   <li><b>heartRatesInBeatsPerMinute</b>:
