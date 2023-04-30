@@ -76,7 +76,7 @@ public final class HealthRecordParser {
   }
 
   private static List<String> stepCountPath() {
-    return List.of("activityData", "summary", "movement", "distance_meters");
+    return List.of("activityData", "summary", "movement", "step_count");
   }
 
   private static double getAverageSpeedInKilometersPerHour(JsonObject object) {
