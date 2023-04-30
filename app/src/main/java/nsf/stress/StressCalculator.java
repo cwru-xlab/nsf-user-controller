@@ -1,7 +1,10 @@
 package nsf.stress;
 
 
+import java.time.Clock;
 import java.util.stream.DoubleStream;
+import nsf.stress.model.HealthRecord;
+import nsf.stress.model.StressScore;
 
 public final class StressCalculator {
 
@@ -13,8 +16,21 @@ public final class StressCalculator {
   private static final double RECOMMENDED_SLEEP_IN_SECONDS = 28800;
   private static final double SCALING = 10;
 
-  public double calculate(HealthRecord record) {
-    var rawScore = SCALING * DoubleStream.of(
+  public final Clock clock;
+
+  public StressCalculator(Clock clock) {
+    this.clock = clock;
+  }
+
+  public StressScore calculate(HealthRecord record) {
+    return StressScore.builder()
+        .value(Math.min(calculateRawValue(record), 100d))
+        .timestamp(clock.instant())
+        .build();
+  }
+  
+  private static double calculateRawValue(HealthRecord record) {
+    return SCALING * DoubleStream.of(
             record.activeDuration().getSeconds() / SECONDS_PER_DAY,
             record.expenditureInKilocalories() / RECOMMENDED_INTAKE_IN_KILOCALORIES,
             record.averageSpeedInKilometersPerHour() / METERS_PER_KILOMETER,
@@ -23,6 +39,5 @@ public final class StressCalculator {
             record.percentHeartRatesAbove(HEART_RATE_SPIKE_THRESHOLD),
             record.sleepDuration().getSeconds() / RECOMMENDED_SLEEP_IN_SECONDS)
         .sum();
-    return Math.min(rawScore, 100);
   }
 }

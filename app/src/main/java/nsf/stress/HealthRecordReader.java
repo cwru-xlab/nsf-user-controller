@@ -11,6 +11,7 @@ import java.util.NavigableMap;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
+import nsf.stress.model.HealthRecord;
 
 public final class HealthRecordReader {
 
