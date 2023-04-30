@@ -64,10 +64,10 @@ abstract class BaseHealthRecord {
   }
 
   private static void checkIsNonNegative(long value, String name) {
-    Preconditions.checkArgument(value >= 0L, "'%s' must be non-negative; got %s", name, value);
+    Preconditions.checkState(value >= 0L, "'%s' must be non-negative; got %s", name, value);
   }
 
   private static void checkIsNonNegative(double value, String name) {
-    Preconditions.checkArgument(value >= 0d, "'%s' must be non-negative; got %s", name, value);
+    Preconditions.checkState(value >= 0d, "'%s' must be non-negative; got %s", name, value);
   }
 }

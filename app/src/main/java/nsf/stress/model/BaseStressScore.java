@@ -16,7 +16,7 @@ abstract class BaseStressScore {
 
   @Value.Check
   protected void check() {
-    Preconditions.checkArgument(
+    Preconditions.checkState(
         isValueInRange(), "'value' must be in the range %s; got %s", VALUE_RANGE, value());
   }
 
