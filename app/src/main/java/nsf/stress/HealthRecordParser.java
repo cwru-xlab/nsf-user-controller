@@ -14,12 +14,6 @@ import nsf.stress.model.HealthRecord;
 
 public final class HealthRecordParser {
 
-  private static final HealthRecordParser INSTANCE = new HealthRecordParser();
-
-  public static HealthRecordParser getInstance() {
-    return INSTANCE;
-  }
-
   /**
    * Parses the JSON-encoded health record.
    * <p>
@@ -47,10 +41,10 @@ public final class HealthRecordParser {
   public HealthRecord parse(JsonObject object) {
     return HealthRecord.builder()
         .activeDuration(getActiveDuration(object))
-        .expenditureInKilocalories(getExpenditureInKilocalories(object))
+        .expenditureInKilocalories(getExpenditure(object))
         .stepCount(getStepCount(object))
-        .averageSpeedInKilometersPerHour(getAverageSpeedInKilometersPerHour(object))
-        .heartRatesInBeatsPerMinute(getHeartRatesInBeatsPerMinute(object))
+        .averageSpeedInKilometersPerHour(getAverageSpeed(object))
+        .heartRatesInBeatsPerMinute(getHeartRates(object))
         .sleepDuration(getSleepDuration(object))
         .build();
   }
@@ -63,7 +57,7 @@ public final class HealthRecordParser {
     return List.of("activityData", "summary", "durations", "active_seconds");
   }
 
-  private static double getExpenditureInKilocalories(JsonObject object) {
+  private static double getExpenditure(JsonObject object) {
     return getValue(object, expenditurePath(), JsonObject::getDouble);
   }
 
@@ -79,7 +73,7 @@ public final class HealthRecordParser {
     return List.of("activityData", "summary", "movement", "step_count");
   }
 
-  private static double getAverageSpeedInKilometersPerHour(JsonObject object) {
+  private static double getAverageSpeed(JsonObject object) {
     return getValue(object, speedPath(), JsonObject::getDouble);
   }
 
@@ -87,7 +81,7 @@ public final class HealthRecordParser {
     return List.of("activityData", "summary", "movement", "speed", "avg_km_h");
   }
 
-  private static NavigableMap<Instant, Integer> getHeartRatesInBeatsPerMinute(JsonObject object) {
+  private static NavigableMap<Instant, Integer> getHeartRates(JsonObject object) {
     var samples = getValue(object, heartRatesPath(), JsonObject::getJsonArray);
     var heartRates = new TreeMap<Instant, Integer>();
     for (int i = 0; i < samples.size(); i++) {
