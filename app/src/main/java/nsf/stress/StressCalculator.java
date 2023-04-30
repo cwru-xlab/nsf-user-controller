@@ -28,7 +28,7 @@ public final class StressCalculator {
         .timestamp(clock.instant())
         .build();
   }
-  
+
   private static double calculateRawValue(HealthRecord record) {
     return SCALING * DoubleStream.of(
             record.activeDuration().getSeconds() / SECONDS_PER_DAY,
