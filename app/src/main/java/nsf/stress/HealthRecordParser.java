@@ -1,11 +1,10 @@
 package nsf.stress;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import com.google.common.base.Preconditions;
 import io.vertx.core.json.JsonObject;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.StringJoiner;
@@ -13,9 +12,34 @@ import java.util.TreeMap;
 import java.util.function.BiFunction;
 import nsf.stress.model.HealthRecord;
 
-public final class HealthRecordReader {
+public final class HealthRecordParser {
 
-  public HealthRecord readFromJson(JsonObject object) {
+  /**
+   * Parses the JSON-encoded health record.
+   * <p>
+   * The following are the expected JSON paths for health record attributes:
+   *
+   * <ul>
+   *   <li><b>activeDuration</b>: activityData.summary.durations.active_seconds</li>
+   *   <li><b>expenditureInKilocalories</b>: activityData.summary.energy_expenditure.active_kcal</li>
+   *   <li><b>distanceInMeters</b>: activityData.summary.movement.distance_meters</li>
+   *   <li><b>stepCount</b>: activityData.summary.movement.step_count</li>
+   *   <li><b>averageSpeedInKilometersPerHour</b>: activityData.summary.movement.speed.avg_km_h</li>
+   *   <li><b>heartRatesInBeatsPerMinute</b>:
+   *      <ul>
+   *        <li>biometricsData.heart_rate.samples_bpm.value</li>
+   *        <li>biometricsData.heart_rate.samples_bpm.time</li>
+   *      </ul>
+   *   <li><b>sleepDuration</b>: sleepData.durations.total_seconds</li>
+   * </ul>
+   *
+   * @param object JSON-encoded health record
+   * @return parsed health record
+   * @throws IllegalArgumentException if a JSON key is not found
+   * @throws ClassCastException       if a JSON value is not the expected type
+   * @throws DateTimeParseException   if a JSON value is not ISO-8601 encoded
+   */
+  public HealthRecord parse(JsonObject object) {
     return HealthRecord.builder()
         .activeDuration(getActiveDuration(object))
         .expenditureInKilocalories(getExpenditureInKilocalories(object))
@@ -28,7 +52,7 @@ public final class HealthRecordReader {
   }
 
   private static Duration getActiveDuration(JsonObject object) {
-    return getValue(object, activeDurationPath(), HealthRecordReader::getDuration);
+    return getValue(object, activeDurationPath(), HealthRecordParser::getDuration);
   }
 
   private static List<String> activeDurationPath() {
@@ -84,7 +108,7 @@ public final class HealthRecordReader {
   }
 
   private static Duration getSleepDuration(JsonObject object) {
-    return getValue(object, sleepDurationPath(), HealthRecordReader::getDuration);
+    return getValue(object, sleepDurationPath(), HealthRecordParser::getDuration);
   }
 
   private static List<String> sleepDurationPath() {
@@ -108,10 +132,10 @@ public final class HealthRecordReader {
         valueObject = valueObject.getJsonObject(key);
       }
     }
-    var key = path.get(valueKeyIndex);
-    subPath.add(key);
-    checkKey(object, valueObject, key, subPath.toString());
-    return mapper.apply(valueObject, key);
+    var valueKey = path.get(valueKeyIndex);
+    subPath.add(valueKey);
+    checkKey(object, valueObject, valueKey, subPath.toString());
+    return mapper.apply(valueObject, valueKey);
   }
 
   private static void checkKey(JsonObject object, JsonObject inner, String key, String path) {
