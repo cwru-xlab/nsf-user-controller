@@ -61,15 +61,21 @@ dependencies {
     implementation "org.slf4j:slf4j-api:2.0.6"
     implementation "org.slf4j:slf4j-reload4j:2.0.7"
 
-    testRuntimeOnly "io.netty:netty-all:4.1.90.Final"
+    testFixturesAnnotationProcessor "org.immutables:value:2.9.2"
+    testFixturesCompileOnly "org.immutables:builder:2.9.2"
+    testFixturesCompileOnly "org.immutables:value:2.9.2"
     testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.2"
     testImplementation "org.junit.jupiter:junit-jupiter-params:5.9.2"
     testImplementation "org.mockito:mockito-junit-jupiter:5.1.1"
     testImplementation "io.vertx:vertx-junit5:4.4.0"
     testImplementation "com.squareup.okhttp3:mockwebserver:5.0.0-alpha.11"
+    testFixturesImplementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0"
     testFixturesImplementation "io.jsonwebtoken:jjwt-api:0.11.5"
+    testFixturesImplementation "io.vertx:vertx-core:4.4.0"
+    testFixturesRuntimeOnly "com.fasterxml.jackson.module:jackson-module-blackbird:2.15.0"
     testRuntimeOnly "io.jsonwebtoken:jjwt-impl:0.11.5"
     testRuntimeOnly "io.jsonwebtoken:jjwt-jackson:0.11.5"
+    testRuntimeOnly "io.netty:netty-all:4.1.90.Final"
 }
 
 test {
