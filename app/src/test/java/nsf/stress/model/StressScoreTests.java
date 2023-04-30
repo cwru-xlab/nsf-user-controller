@@ -8,7 +8,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-@SuppressWarnings("ResultOfMethodCallIgnored")
 public final class StressScoreTests {
 
   private StressScoreTests() {
@@ -41,16 +40,21 @@ public final class StressScoreTests {
 
   private static Stream<Arguments> validStressScoreValuesAndTimestamps() {
     return Stream.of(
-        Arguments.of(0d, Instant.MIN),
-        Arguments.of(0d, Instant.MAX),
-        Arguments.of(100d, Instant.MIN),
-        Arguments.of(100d, Instant.MAX),
-        Arguments.of(12.345d, Instant.ofEpochMilli(123456789))
+        Arguments.of(StressScore.MIN_VALUE, Instant.MIN),
+        Arguments.of(StressScore.MIN_VALUE, Instant.MAX),
+        Arguments.of(StressScore.MAX_VALUE, Instant.MIN),
+        Arguments.of(StressScore.MAX_VALUE, Instant.MAX),
+        Arguments.of(StressScore.MAX_VALUE / 4.56, Instant.ofEpochMilli(123456789))
     );
   }
 
   private static Stream<Arguments> invalidStressScoreValues() {
-    return Stream.of(-0.123, Math.nextDown(0), Math.nextUp(100d), 123.45d).map(Arguments::of);
+    return Stream.of(
+            StressScore.MIN_VALUE - 0.123,
+            Math.nextDown(StressScore.MIN_VALUE),
+            Math.nextUp(StressScore.MAX_VALUE),
+            StressScore.MAX_VALUE + 0.456)
+        .map(Arguments::of);
   }
 
   private static void buildStressScore(double value, Instant timestamp) {

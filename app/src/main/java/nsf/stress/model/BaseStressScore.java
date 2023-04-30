@@ -8,7 +8,10 @@ import org.immutables.value.Value;
 @Value.Immutable
 abstract class BaseStressScore {
 
-  private static final Range<Double> VALUE_RANGE = Range.closed(0d, 100d);
+  public static final double MIN_VALUE = 0d;
+  public static final double MAX_VALUE = 100d;
+
+  private static final Range<Double> VALUE_RANGE = Range.closed(MIN_VALUE, MAX_VALUE);
 
   public abstract Instant timestamp();
 

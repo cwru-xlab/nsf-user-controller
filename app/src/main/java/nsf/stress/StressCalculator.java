@@ -24,7 +24,7 @@ public final class StressCalculator {
 
   public StressScore calculate(HealthRecord record) {
     return StressScore.builder()
-        .value(Math.min(calculateRawValue(record), 100d))
+        .value(Math.min(calculateRawValue(record), StressScore.MAX_VALUE))
         .timestamp(clock.instant())
         .build();
   }
