@@ -1,6 +1,6 @@
 package nsf.stress;
 
-public class HealthRecordParserTests {
+public final class HealthRecordParserTests {
 
   private HealthRecordParserTests() {
   }
