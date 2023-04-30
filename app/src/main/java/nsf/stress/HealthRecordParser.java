@@ -14,6 +14,12 @@ import nsf.stress.model.HealthRecord;
 
 public final class HealthRecordParser {
 
+  private static final HealthRecordParser INSTANCE = new HealthRecordParser();
+
+  public static HealthRecordParser getInstance() {
+    return INSTANCE;
+  }
+
   /**
    * Parses the JSON-encoded health record.
    * <p>
@@ -44,7 +50,6 @@ public final class HealthRecordParser {
         .activeDuration(getActiveDuration(object))
         .expenditureInKilocalories(getExpenditureInKilocalories(object))
         .stepCount(getStepCount(object))
-        .distanceInMeters(getDistanceInMeters(object))
         .averageSpeedInKilometersPerHour(getAverageSpeedInKilometersPerHour(object))
         .heartRatesInBeatsPerMinute(getHeartRatesInBeatsPerMinute(object))
         .sleepDuration(getSleepDuration(object))
@@ -73,14 +78,6 @@ public final class HealthRecordParser {
 
   private static List<String> stepCountPath() {
     return List.of("activityData", "summary", "movement", "distance_meters");
-  }
-
-  private static double getDistanceInMeters(JsonObject object) {
-    return getValue(object, distancePath(), JsonObject::getDouble);
-  }
-
-  private static List<String> distancePath() {
-    return List.of("activityData", "summary", "movement", "step_count");
   }
 
   private static double getAverageSpeedInKilometersPerHour(JsonObject object) {
@@ -140,7 +137,7 @@ public final class HealthRecordParser {
 
   private static void checkKey(JsonObject object, JsonObject inner, String key, String path) {
     Preconditions.checkArgument(
-        inner.containsKey(key), "Key '%s' not found in object: %s", path, object);
+        inner.containsKey(key), "Key \"%s\" not found in object: %s", path, object);
   }
 
   private static Duration getDuration(JsonObject object, String key) {

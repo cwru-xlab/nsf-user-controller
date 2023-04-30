@@ -16,18 +16,14 @@ abstract class BaseHealthRecord {
 
   public abstract long stepCount();
 
-  public abstract double distanceInMeters();
-
   public abstract double averageSpeedInKilometersPerHour();
 
   public abstract NavigableMap<Instant, Integer> heartRatesInBeatsPerMinute();
 
   public abstract Duration sleepDuration();
-
   @Value.Derived
   public double averageHeartRateReserve() {
-    var maxHeartRate = maxHeartRateInBeatsPerMinute();
-    return maxHeartRate == 0d ? 0d : averageHeartRate() / maxHeartRate;
+    return safeDivide(averageHeartRate(), maxHeartRateInBeatsPerMinute());
   }
 
   @Value.Derived
@@ -41,33 +37,30 @@ abstract class BaseHealthRecord {
   }
 
   public double percentHeartRatesAbove(int beatsPerMinute) {
-    if (heartRatesInBeatsPerMinute().isEmpty()) {
-      return 0;
-    } else {
-      double nAbove = heartRates().filter(bpm -> bpm > beatsPerMinute).count();
-      return nAbove / heartRatesInBeatsPerMinute().size();
-    }
+    double nAbove = heartRates().filter(bpm -> bpm > beatsPerMinute).count();
+    return safeDivide(nAbove, heartRatesInBeatsPerMinute().size());
   }
 
   @Value.Check
   protected void check() {
-    checkIsNonNegative(activeDuration().getSeconds(), "activeDuration");
-    checkIsNonNegative(expenditureInKilocalories(), "expenditureInKilocalories");
-    checkIsNonNegative(stepCount(), "stepCount");
-    checkIsNonNegative(distanceInMeters(), "distanceInMeters");
-    checkIsNonNegative(averageSpeedInKilometersPerHour(), "averageSpeedInKilometersPerHour");
-    heartRatesInBeatsPerMinute().values().forEach(hr -> checkIsNonNegative(hr, "heartRate"));
+    checkIsFiniteNonNegative(activeDuration().getSeconds(), "activeDuration");
+    checkIsFiniteNonNegative(expenditureInKilocalories(), "expenditureInKilocalories");
+    checkIsFiniteNonNegative(stepCount(), "stepCount");
+    checkIsFiniteNonNegative(averageSpeedInKilometersPerHour(), "averageSpeedInKilometersPerHour");
+    checkIsFiniteNonNegative(sleepDuration().getSeconds(), "sleepDuration");
+    heartRatesInBeatsPerMinute().values().forEach(hr -> checkIsFiniteNonNegative(hr, "heartRate"));
   }
 
   private IntStream heartRates() {
     return heartRatesInBeatsPerMinute().values().stream().mapToInt(Integer::valueOf);
   }
 
-  private static void checkIsNonNegative(long value, String name) {
-    Preconditions.checkState(value >= 0L, "'%s' must be non-negative; got %s", name, value);
+  private static double safeDivide(double dividend, double divisor) {
+    return divisor != 0d ? dividend / divisor : 0d;
   }
 
-  private static void checkIsNonNegative(double value, String name) {
-    Preconditions.checkState(value >= 0d, "'%s' must be non-negative; got %s", name, value);
+  private static void checkIsFiniteNonNegative(double value, String name) {
+    boolean isValid = Double.isFinite(value) && value >= 0d;
+    Preconditions.checkState(isValid, "\"%s\" must be finite and non-negative; got %s", name, value);
   }
 }
