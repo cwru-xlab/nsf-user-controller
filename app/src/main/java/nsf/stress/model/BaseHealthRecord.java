@@ -21,6 +21,7 @@ abstract class BaseHealthRecord {
   public abstract NavigableMap<Instant, Integer> heartRatesInBeatsPerMinute();
 
   public abstract Duration sleepDuration();
+
   @Value.Derived
   public double averageHeartRateReserve() {
     return safeDivide(averageHeartRate(), maxHeartRateInBeatsPerMinute());
