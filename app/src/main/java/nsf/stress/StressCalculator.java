@@ -8,13 +8,13 @@ import nsf.stress.model.StressScore;
 
 public final class StressCalculator {
 
-  private static final double SECONDS_PER_DAY = 86400;
-  private static final double RECOMMENDED_INTAKE_IN_KILOCALORIES = 2000;
-  private static final double METERS_PER_KILOMETER = 1000;
-  private static final double TARGET_MAX_HEART_RATE = 200;
+  private static final double SECONDS_PER_DAY = 86400d;
+  private static final double RECOMMENDED_INTAKE_IN_KILOCALORIES = 2000d;
+  private static final double METERS_PER_KILOMETER = 1000d;
+  private static final double TARGET_MAX_HEART_RATE = 200d;
   private static final int HEART_RATE_SPIKE_THRESHOLD = 80;
-  private static final double RECOMMENDED_SLEEP_IN_SECONDS = 28800;
-  private static final double SCALING = 10;
+  private static final double RECOMMENDED_SLEEP_IN_SECONDS = 28800d;
+  private static final double SCALING = 10d;
 
   public final Clock clock;
 
