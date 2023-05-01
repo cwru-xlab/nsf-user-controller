@@ -21,15 +21,15 @@ public final class HealthRecords {
   private static final long STEP_COUNT = 10_002L;
   private static final Instant HR_TIME = Instant.EPOCH;
   private static final int HR_VALUE = 65;
-  private static final Map<Instant, Integer> HEART_RATES = Map.of(HR_TIME, HR_VALUE);
-  private static final NavigableMap<Instant, Integer> HR_TREE_MAP = new TreeMap<>(HEART_RATES);
+  private static final Map<Instant, Integer> HR_MAP = Map.of(HR_TIME, HR_VALUE);
+  private static final NavigableMap<Instant, Integer> HR_TREE_MAP = new TreeMap<>(HR_MAP);
   private static final long SLEEP_DURATION_LONG = 4567L;
   private static final Duration SLEEP_DURATION = Duration.ofSeconds(SLEEP_DURATION_LONG);
 
   private static final Object INVALID_TYPE = new Object();
-  private static final Map<?, ?> INVALID_HEART_RATES_TIME_TYPE = Map.of(INVALID_TYPE, HR_VALUE);
-  private static final Map<?, ?> INVALID_HEART_RATES_TIME_ENCODING = Map.of("2023-01-01", HR_VALUE);
-  private static final Map<?, ?> INVALID_HEART_RATES_VALUE_TYPE = Map.of(HR_TIME, INVALID_TYPE);
+  private static final Map<?, ?> INVALID_HR_TIME_TYPE = Map.of(INVALID_TYPE, HR_VALUE);
+  private static final Map<?, ?> INVALID_HR_TIME_ENCODING = Map.of("2023-01-01", HR_VALUE);
+  private static final Map<?, ?> INVALID_HR_VALUE_TYPE = Map.of(HR_TIME, INVALID_TYPE);
 
   private HealthRecords() {
   }
@@ -193,7 +193,7 @@ public final class HealthRecords {
         .activeDuration(INVALID_TYPE)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -204,7 +204,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(INVALID_TYPE)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -215,7 +215,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(INVALID_TYPE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -226,7 +226,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(INVALID_TYPE)
         .stepCount(STEP_COUNT)
         .build();
@@ -248,7 +248,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(INVALID_HEART_RATES_TIME_ENCODING)
+        .heartRatesInBeatsPerMinute(INVALID_HR_TIME_ENCODING)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -259,7 +259,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(INVALID_HEART_RATES_TIME_TYPE)
+        .heartRatesInBeatsPerMinute(INVALID_HR_TIME_TYPE)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -270,7 +270,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(INVALID_HEART_RATES_VALUE_TYPE)
+        .heartRatesInBeatsPerMinute(INVALID_HR_VALUE_TYPE)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -281,7 +281,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(INVALID_TYPE)
         .build();
@@ -291,7 +291,7 @@ public final class HealthRecords {
     return HealthRecordJsonBuilder.create()
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -301,7 +301,7 @@ public final class HealthRecords {
     return HealthRecordJsonBuilder.create()
         .activeDuration(ACTIVE_DURATION_LONG)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -311,7 +311,7 @@ public final class HealthRecords {
     return HealthRecordJsonBuilder.create()
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -332,7 +332,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .stepCount(STEP_COUNT)
         .build();
   }
@@ -342,7 +342,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .build();
   }
@@ -362,7 +362,7 @@ public final class HealthRecords {
         .activeDuration(ACTIVE_DURATION_LONG)
         .averageSpeedInKilometersPerHour(AVERAGE_SPEED)
         .expenditureInKilocalories(EXPENDITURE)
-        .heartRatesInBeatsPerMinute(HEART_RATES)
+        .heartRatesInBeatsPerMinute(HR_MAP)
         .sleepDuration(SLEEP_DURATION_LONG)
         .stepCount(STEP_COUNT)
         .build();
@@ -376,16 +376,16 @@ public final class HealthRecords {
       Optional<Object> heartRatesInBeatsPerMinute,
       Optional<Object> sleepDuration,
       Optional<Object> stepCount) {
-    var object = new JsonObject();
+    var json = new JsonObject();
     addActivityData(
         activeDuration,
         averageSpeedInKilometersPerHour,
         expenditureInKilocalories,
         stepCount,
-        object);
-    addBiometricsData(heartRatesInBeatsPerMinute, object);
-    addSleepData(sleepDuration, object);
-    return object;
+        json);
+    addBiometricsData(heartRatesInBeatsPerMinute, json);
+    addSleepData(sleepDuration, json);
+    return json;
   }
 
   private static void addActivityData(

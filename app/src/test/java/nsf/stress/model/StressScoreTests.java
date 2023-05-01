@@ -70,6 +70,6 @@ public final class StressScoreTests {
   }
 
   private static void buildWithMissingTimestamp() {
-    StressScore.builder().value(0d).build();
+    StressScore.builder().value(StressScore.MIN_VALUE).build();
   }
 }
