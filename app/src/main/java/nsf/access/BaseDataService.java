@@ -2,11 +2,8 @@ package nsf.access;
 
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
-import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.mongo.BulkOperation;
 import io.vertx.ext.mongo.MongoClient;
-import io.vertx.ext.mongo.MongoClientBulkWriteResult;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +15,7 @@ import java.util.function.Function;
 @Value.Immutable
 public abstract class BaseDataService {
   private static final Logger logger = LoggerFactory.getLogger(BaseDataService.class);
-  public static String namespaceToCollection(String namespace){
+  public static String namespaceToCollectionName(String namespace){
     return "data." + namespace;
   }
   public abstract MongoClient client();
@@ -28,21 +25,20 @@ public abstract class BaseDataService {
    */
   public Future<List<JsonObject>> readNamespaceData(String namespace){
     JsonObject query = new JsonObject();
-    return client().find(namespaceToCollection(namespace), query);
+    return client().find(namespaceToCollectionName(namespace), query);
   }
 
   /**
-   * Adds new JSON data. This data must follow the schema where the first layer objects (immediate children of the
-   * given/root new data object) are for the different namespaces being updated, and the children of those objects
-   * are the new data of those specific namespaces.
+   * Saves new JSON namespaces in the database. This data must follow the schema where the first layer objects
+   * (immediate children of the given/root new data object) are for the different namespaces being updated.
    */
-  public Future addData(JsonObject namespacesNewData){
+  public Future<CompositeFuture> saveNewNamespaces(JsonObject newNamespacesData){
     return client().getCollections().compose(collections -> {
-      List<Future<MongoClientBulkWriteResult>> namespaceWriteResults = new ArrayList<>();
-      for (String namespace : namespacesNewData.fieldNames()){
-        Object namespaceNewData = namespacesNewData.getValue(namespace);
-        namespaceWriteResults.add(addJsonItemsToNamespace(namespace, namespaceNewData,
-            collection -> collections.contains(collection)));
+      List<Future<Void>> namespaceWriteResults = new ArrayList<>();
+      for (String namespaceName : newNamespacesData.fieldNames()){
+        JsonObject namespaceValue = newNamespacesData.getJsonObject(namespaceName);
+        namespaceWriteResults.add(addJsonObjToNamespace(namespaceName, namespaceValue,
+            collections::contains));
       }
       return CompositeFuture.all(new ArrayList<>(namespaceWriteResults));
     });
@@ -51,42 +47,28 @@ public abstract class BaseDataService {
   /**
    * Adds JSON data to a namespace, which may or may not already have a backing MongoDB collection for it. (This will
    * make the collection if it doesn't already exist).
-   * TODO refactor
-   * @param namespace the name of the namespace to add the new data to
-   * @param newData the new data, either a JSON object or JSON array
-   * @param collectionExistsChecker function to check if a collection already exists in MongoDB.
    */
-  private Future<MongoClientBulkWriteResult> addJsonItemsToNamespace(String namespace, Object newData,
-                                                                Function<String, Boolean> collectionExistsChecker){
-    String namespaceCollection = namespaceToCollection(namespace);
+  private Future<Void> addJsonObjToNamespace(String namespaceName, JsonObject newData,
+                                       Function<String, Boolean> collectionExistsChecker){
+    String namespaceCollection = namespaceToCollectionName(namespaceName);
     // If the collection already exists, then just add the new data to it:
     if (collectionExistsChecker.apply(namespaceCollection)){
-      return addJsonItemsToCollection(namespaceCollection, newData);
+      return addJsonObjToCollection(namespaceCollection, newData);
     }
     // If the collection doesn't already exist, then make it before adding the new data:
     else{
       return client().createCollection(namespaceCollection)
           .onFailure(x -> logger.error(x.toString()))
-          .compose(discard -> addJsonItemsToCollection(namespaceCollection, newData));
+          .compose(discard -> addJsonObjToCollection(namespaceCollection, newData));
     }
   }
 
   /**
-   * Adds JSON data as documents to an existing MongoDB collection.
+   * Adds JSON data as documents to an existing MongoDB collection, forgetting about the document's ID.
    */
-  private Future<MongoClientBulkWriteResult> addJsonItemsToCollection(String collection,
-                                                                      Object newItems){
-    List<BulkOperation> bulkAddNamespaceData = new ArrayList<>();
-    if (newItems instanceof JsonArray){
-      for (Object item : (JsonArray) newItems){
-        if (item instanceof JsonObject){
-          bulkAddNamespaceData.add(BulkOperation.createInsert((JsonObject)item));
-        }
-      }
-    }
-    else if (newItems instanceof JsonObject){
-      // TODO
-    }
-    return this.client().bulkWrite(collection, bulkAddNamespaceData);
+  private Future<Void> addJsonObjToCollection(String collection, JsonObject newJsonObjDoc){
+    return this.client().save(collection, newJsonObjDoc)
+        // Save Future completes with the document's ID, but we don't care about it:
+        .compose(discardedDocId -> Future.succeededFuture());
   }
 }

@@ -1,6 +1,13 @@
 package nsf.access;
 
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import nsf.stress.HealthRecordParser;
+import nsf.stress.StressCalculator;
+import nsf.stress.model.HealthRecord;
+import nsf.stress.model.StressScore;
+
+import java.time.Clock;
 
 /**
  * Transforms incoming pushable data to transform any data before being pushed to Service Providers. For example to
@@ -8,19 +15,40 @@ import io.vertx.core.json.JsonObject;
  */
 public class PushDataTransformer {
 
-  public static JsonObject transformPushableData(JsonObject pushableData){
-    JsonObject transformedPushData = pushableData.copy();
+  public static JsonObject transformPushableData(JsonObject dataPlugJson){
+    JsonObject dataPlugJsonCopy = dataPlugJson.copy();
+    JsonObject healthRecordJson = healthRecordJsonFromDataPlug(dataPlugJsonCopy);
 
-    JsonObject stressScoreData = new JsonObject();
-    if (transformedPushData.containsKey("heartbeat-data")){
-      JsonObject heartbeatData = transformedPushData.getJsonObject("heartbeat-data");
-      if (heartbeatData.containsKey("wee")){
-        stressScoreData.put("wee", heartbeatData.getString("wee") + " anonymized - (this is all just a " +
-            "placeholder for the real stress score calculation)");
+    HealthRecordParser parser = new HealthRecordParser();
+    HealthRecord record = parser.parse(healthRecordJson);
+    StressCalculator calculator = new StressCalculator(Clock.systemUTC());
+    StressScore stressScore = calculator.calculate(record);
+
+    dataPlugJsonCopy.put("stress-score-data", stressScore);
+    return dataPlugJsonCopy;
+  }
+
+  /**
+   * Adapts Data Plug JSON to Health Record JSON -- Ideally in the future these two schemas could fully match up such
+   * that this method may no longer be needed.
+   */
+  private static JsonObject healthRecordJsonFromDataPlug(JsonObject dataPlugJson) {
+    JsonObject rawHealthData = dataPlugJson.getJsonObject("raw-health-data");
+
+    { // Change time sample zone offset to abbr
+      JsonArray heartRateSamples = rawHealthData.getJsonObject("biometrics")
+          .getJsonObject("heart_rate")
+          .getJsonArray("samples_bpm");
+      for (Object sample : heartRateSamples){
+        JsonObject sampleObj = (JsonObject) sample;
+        String fixedTime = sampleObj.getString("time").replace("+00:00", "Z");
+        sampleObj.put("time", fixedTime);
       }
-      transformedPushData.put("stress-score-data", stressScoreData);
     }
 
-    return transformedPushData;
+    return new JsonObject()
+        .put("activityData", rawHealthData.getJsonObject("activity"))
+        .put("biometricsData", rawHealthData.getJsonObject("biometrics"))
+        .put("sleepData", rawHealthData.getJsonObject("sleep"));
   }
 }

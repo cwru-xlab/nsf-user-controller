@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -23,30 +24,31 @@ public class PushDataHandler implements Handler<RoutingContext> {
   private final BaseAccessControlService accessControlService;
   private final BaseServProvService servProvService;
   private final BaseDataService dataService;
-  private final Function<JsonObject,JsonObject> pushableDataTransformer;
+  private final Function<JsonObject,JsonObject> dataPlugTransformer;
 
   public PushDataHandler(AriesClient ariesClient, BaseAccessControlService accessControlService,
                          BaseServProvService servProvService, BaseDataService dataService, Function<JsonObject,
-                         JsonObject> pushableDataTransformer){
+                         JsonObject> dataPlugTransformer){
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
     this.servProvService = servProvService;
     this.dataService = dataService;
-    this.pushableDataTransformer = pushableDataTransformer;
+    this.dataPlugTransformer = dataPlugTransformer;
   }
 
   @Override
   public void handle(RoutingContext ctx) {
-    JsonObject newDataJson = ctx.body().asJsonObject();
+    JsonObject dataPlugJson = ctx.body().asJsonObject();
 
-    dataService.addData(newDataJson).onSuccess(discard -> {
+    // TODO fix should also save stress score calc
+    dataService.saveNewNamespaces(dataPlugJson).onSuccess(discard -> {
       // TODO refactor
       accessControlService.readAllSubscribePolicies()
           .onSuccess(policies -> {
             // Transform the incoming data into the data that will actually be pushed:
-            JsonObject finalPushData = pushableDataTransformer.apply(newDataJson);
+            JsonObject outboundJson = dataPlugTransformer.apply(dataPlugJson);
             // Push to Service Providers:
-            List<Future<String>> pushFutures = pushToServProvs(finalPushData, policies);
+            List<Future<String>> pushFutures = pushToServProvs(outboundJson, policies);
 
             // Wait till pushed to all Service Providers, then respond with the respective result messages:
             CompositeFuture.all(new ArrayList<>(pushFutures))
@@ -82,39 +84,52 @@ public class PushDataHandler implements Handler<RoutingContext> {
 
   /**
    * Pushes the given JSON resources (which include all the data in those resources) according to the given policies.
-   * @param pushableJsonResources a JSON object where each child key-value represents a resource and that resource's
+   * @param resources a JSON object where each child key-value represents a resource and that resource's
    *                              data respectively.
    * @param policies the considered policies that say which Service Providers are subscribed to which resources.
    * @return a list of futures where each sends a message to a service provider (which "pushes" the new data to them).
    */
-  private List<Future<String>> pushToServProvs(JsonObject pushableJsonResources, List<Policy> policies){
+  private List<Future<String>> pushToServProvs(JsonObject resources, List<Policy> policies){
     List<Future<String>> pushFutures = new ArrayList<>();
     for (Policy servProvPolicy : policies){
       String servProvId = servProvPolicy.serviceProviderId();
 
-      // Get the resources that this Service Provider is subscribed to:
-      List<String> subscribedResources = servProvPolicy.resources().stream()
-          .filter(pushableJsonResources::containsKey).collect(Collectors.toList());
+      Optional<JsonObject> servProvPushData = makeServProvPushData(resources, servProvPolicy);
 
       // Do nothing if this Service Provider is not subscribed to any of the given resources:
-      if (subscribedResources.size() == 0)
+      if (servProvPushData.isEmpty())
         continue;
 
-      // Turn the resources into a JSON data body:
-      JsonObject servProvPushData = new JsonObject();
-      for (String resource : subscribedResources)
-        servProvPushData.put(resource, pushableJsonResources.getJsonArray(resource));
-
       // Future push the JSON data and give a result message:
-      Future<String> sendMessageFuture = pushDataToServProv(servProvPushData, servProvId)
+      Future<String> sendMessageFuture = pushDataToServProv(servProvPushData.get(), servProvId)
           .compose(connId -> {
             Promise<String> promise = Promise.promise();
-            promise.complete("Pushed [" + String.join(", ", subscribedResources) + "] to " + servProvId);
+            promise.complete("Pushed [" + String.join(", ", servProvPushData.get().fieldNames()) + "] to " + servProvId);
             return promise.future();
           });
       pushFutures.add(sendMessageFuture);
     }
     return pushFutures;
+  }
+
+  /**
+   * Filters resources according to a Service Provider's Access Policy.
+   */
+  private Optional<JsonObject> makeServProvPushData(JsonObject unfilteredResources, Policy servProvPolicy){
+    // Get the resources that this Service Provider is subscribed to:
+    List<String> allSubscribedResourceNames = servProvPolicy.resources();
+
+    // Filter the resources by their name:
+    JsonObject filteredResources = new JsonObject();
+    unfilteredResources.stream()
+        .filter((entry) -> allSubscribedResourceNames.contains(entry.getKey()))
+        .forEach(entry -> filteredResources.put(entry.getKey(), entry.getValue()));
+
+    // No push data if there are no resources to send:
+    if (filteredResources.stream().count() == 0)
+      return Optional.empty();
+
+    return Optional.of(filteredResources);
   }
 
   /**
