@@ -2,14 +2,15 @@ package nsf.stress;
 
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import nsf.stress.model.HealthRecord;
+import org.immutables.builder.Builder;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.TreeMap;
-import nsf.stress.model.HealthRecord;
-import org.immutables.builder.Builder;
 
 @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public final class HealthRecords {
@@ -401,7 +402,7 @@ public final class HealthRecords {
         summary.put("durations", JsonObject.of("active_seconds", duration)));
     expenditureInKilocalories.ifPresent(expenditure ->
         summary.put("energy_expenditure", JsonObject.of("active_kcal", expenditure)));
-    stepCount.ifPresent(count -> movement.put("step_count", count));
+    stepCount.ifPresent(count -> movement.put("steps_count", count));
     averageSpeedInKilometersPerHour.ifPresent(speed ->
         movement.put("speed", JsonObject.of("avg_km_h", speed)));
     summary.put("movement", movement);

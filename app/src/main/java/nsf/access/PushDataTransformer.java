@@ -24,7 +24,7 @@ public class PushDataTransformer {
     StressCalculator calculator = new StressCalculator(Clock.systemUTC());
     StressScore stressScore = calculator.calculate(record);
 
-    dataPlugJsonCopy.put("stress-score-data", stressScore);
+    dataPlugJsonCopy.put("stress-score-data", JsonObject.mapFrom(stressScore)); // ClassCast error in MongoDB save
     return dataPlugJsonCopy;
   }
 

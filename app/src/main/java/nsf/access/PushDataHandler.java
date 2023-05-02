@@ -38,17 +38,17 @@ public class PushDataHandler implements Handler<RoutingContext> {
 
   @Override
   public void handle(RoutingContext ctx) {
-    JsonObject dataPlugJson = ctx.body().asJsonObject();
+    JsonObject newDataPlugResources = ctx.body().asJsonObject();
 
-    // TODO fix should also save stress score calc
-    dataService.saveNewNamespaces(dataPlugJson).onSuccess(discard -> {
-      // TODO refactor
-      accessControlService.readAllSubscribePolicies()
-          .onSuccess(policies -> {
-            // Transform the incoming data into the data that will actually be pushed:
-            JsonObject outboundJson = dataPlugTransformer.apply(dataPlugJson);
+    // TODO refactor
+    accessControlService.readAllSubscribePolicies()
+        .onSuccess(policies -> {
+          // Transform the incoming data into the data that will actually be pushed:
+          JsonObject resourcesWithStressScores = dataPlugTransformer.apply(newDataPlugResources);
+
+          dataService.saveNewNamespaces(resourcesWithStressScores).onSuccess(discard -> {
             // Push to Service Providers:
-            List<Future<String>> pushFutures = pushToServProvs(outboundJson, policies);
+            List<Future<String>> pushFutures = pushToServProvs(resourcesWithStressScores, policies);
 
             // Wait till pushed to all Service Providers, then respond with the respective result messages:
             CompositeFuture.all(new ArrayList<>(pushFutures))
@@ -60,10 +60,9 @@ public class PushDataHandler implements Handler<RoutingContext> {
                   logger.info("Pushed new data ({} pushes):\n{}", resultMsgs.size(), combinedResultMsgs);
 
                   // Respond:
-                  if (resultMsgs.size() > 0){
+                  if (resultMsgs.size() > 0) {
                     ctx.response().setStatusCode(200).send("Pushed new data:\n " + combinedResultMsgs);
-                  }
-                  else{
+                  } else {
                     ctx.response().setStatusCode(200).send("Pushed no data, as no Service Providers were subscribed to " +
                         "any of the pushed resources.");
                   }
@@ -73,13 +72,13 @@ public class PushDataHandler implements Handler<RoutingContext> {
                   ctx.response().setStatusCode(500).send("Failed to push new data because the following exception " +
                       "occurred during a push to a Service Provider: " + e);
                 });
-          })
-          .onFailure((Throwable e) -> {
-            logger.error("Failed to read access control subscribe policies.", e);
-            ctx.response().setStatusCode(500).send("Failed to push because failed to read access control " +
-                "subscribe policies: " + e);
           });
-    });
+        })
+        .onFailure((Throwable e) -> {
+          logger.error("Failed to read access control subscribe policies.", e);
+          ctx.response().setStatusCode(500).send("Failed to push because failed to read access control " +
+              "subscribe policies: " + e);
+        });
   }
 
   /**
