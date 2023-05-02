@@ -2,6 +2,8 @@ package nsf.stress;
 
 import com.google.common.base.Preconditions;
 import io.vertx.core.json.JsonObject;
+import nsf.stress.model.HealthRecord;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -10,7 +12,6 @@ import java.util.NavigableMap;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.function.BiFunction;
-import nsf.stress.model.HealthRecord;
 
 public final class HealthRecordParser {
 
@@ -22,7 +23,7 @@ public final class HealthRecordParser {
    * <ul>
    *   <li><b>activeDuration</b>: activityData.summary.durations.active_seconds</li>
    *   <li><b>expenditureInKilocalories</b>: activityData.summary.energy_expenditure.active_kcal</li>
-   *   <li><b>stepCount</b>: activityData.summary.movement.step_count</li>
+   *   <li><b>stepCount</b>: activityData.summary.movement.steps_count</li>
    *   <li><b>averageSpeedInKilometersPerHour</b>: activityData.summary.movement.speed.avg_km_h</li>
    *   <li><b>heartRatesInBeatsPerMinute</b>:
    *      <ul>
@@ -70,7 +71,7 @@ public final class HealthRecordParser {
   }
 
   private static List<String> stepCountPath() {
-    return List.of("activityData", "summary", "movement", "step_count");
+    return List.of("activityData", "summary", "movement", "steps_count");
   }
 
   private static double getAverageSpeed(JsonObject json) {
