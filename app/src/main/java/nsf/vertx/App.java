@@ -1,7 +1,9 @@
 package nsf.vertx;
 
+import com.fasterxml.jackson.databind.SerializationFeature;
 import io.vertx.core.Context;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.jackson.DatabindCodec;
 import io.vertx.ext.mongo.MongoClient;
 import nsf.access.*;
 import nsf.controller.ControllerVerticle;
@@ -15,6 +17,8 @@ public class App {
   public static void main(String[] args) {
     BasicConfigurator.configure();
     Logger.getRootLogger().setLevel(Level.INFO);
+
+    DatabindCodec.mapper().configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
     Vertx vertx = Vertx.vertx();
 
