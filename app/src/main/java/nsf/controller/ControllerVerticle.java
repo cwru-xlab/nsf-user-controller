@@ -5,11 +5,13 @@ import com.google.gson.reflect.TypeToken;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.CorsHandler;
 import nsf.access.*;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.connection.ConnectionRecord;
@@ -45,6 +47,20 @@ public class ControllerVerticle extends AbstractVerticle {
   @Override
   public void start(Promise<Void> promise) {
     Router router = Router.router(vertx);
+    router.route().handler(CorsHandler.create("*")
+        .allowedMethod(HttpMethod.GET)
+        .allowedMethod(HttpMethod.POST)
+        .allowedMethod(HttpMethod.OPTIONS)
+        .allowedMethod(HttpMethod.DELETE)
+        .allowedMethod(HttpMethod.PATCH)
+        .allowedMethod(HttpMethod.PUT)
+        .allowCredentials(true)
+        .allowedHeader("Access-Control-Allow-Headers")
+        .allowedHeader("Authorization")
+        .allowedHeader("Access-Control-Allow-Method")
+        .allowedHeader("Access-Control-Allow-Origin")
+        .allowedHeader("Access-Control-Allow-Credentials")
+        .allowedHeader("Content-Type"));
     router.route().handler(BodyHandler.create());
 
     // TODO Refactor split up into multiple handler files.
