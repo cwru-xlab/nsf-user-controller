@@ -38,6 +38,8 @@ public class PushDataHandler implements Handler<RoutingContext> {
 
   @Override
   public void handle(RoutingContext ctx) {
+    System.out.println("Received push data: " + ctx.body().asString());
+
     JsonObject newDataPlugResources = ctx.body().asJsonObject();
 
     // TODO refactor
