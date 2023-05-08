@@ -14,7 +14,7 @@ FROM openjdk:11-jre-slim
 WORKDIR /app
 
 # Copy the shadow JAR from the builder stage to the final image
-COPY --from=builder /app/app/build/libs/app.jar .
+COPY --from=builder /app/app/build/libs/app-all.jar ./app.jar
 
 # Start the application
 CMD ["java", "-jar", "app.jar"]
