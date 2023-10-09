@@ -46,7 +46,15 @@ public class PushDataHandler implements Handler<RoutingContext> {
     accessControlService.readAllSubscribePolicies()
         .onSuccess(policies -> {
           // Transform the incoming data into the data that will actually be pushed:
-          JsonObject resourcesWithStressScores = dataPlugTransformer.apply(newDataPlugResources);
+          JsonObject resourcesWithStressScores;
+          try{
+              resourcesWithStressScores = dataPlugTransformer.apply(newDataPlugResources);
+          }
+          catch (Exception e){
+              logger.error("Failed to push new data, couldn't make stress score data.", e);
+              ctx.response().setStatusCode(400).send("Failed to push new data because there was not enough data to make stress score data: " + e);
+              return;
+          }
 
           dataService.saveNewNamespaces(resourcesWithStressScores).onSuccess(discard -> {
             // Push to Service Providers:
