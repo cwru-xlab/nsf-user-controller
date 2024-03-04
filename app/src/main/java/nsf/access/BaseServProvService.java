@@ -7,6 +7,7 @@ import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import org.immutables.value.Value;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -32,6 +33,11 @@ public abstract class BaseServProvService {
 //    //      return promise.future();
 //    //    })
 //  }
+
+  public Future<List<JsonObject>> listServProvs(){
+    JsonObject query = new JsonObject();
+    return client().find(collection(), query);
+  }
 
   // TODO REFACTOR USE COMMON GUARD FUNC AND ALSO EVENTUALLY REFACTOR INTO POJO
   public Future<String> getServProvConnId(String servProvId){

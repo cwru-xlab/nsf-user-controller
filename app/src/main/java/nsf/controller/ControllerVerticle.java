@@ -4,8 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
@@ -47,27 +50,39 @@ public class ControllerVerticle extends AbstractVerticle {
   @Override
   public void start(Promise<Void> promise) {
     Router router = Router.router(vertx);
-    router.route().handler(CorsHandler.create("*")
-        .allowedMethod(HttpMethod.GET)
-        .allowedMethod(HttpMethod.POST)
-        .allowedMethod(HttpMethod.OPTIONS)
-        .allowedMethod(HttpMethod.DELETE)
-        .allowedMethod(HttpMethod.PATCH)
-        .allowedMethod(HttpMethod.PUT)
-        .allowCredentials(true)
-        .allowedHeader("Access-Control-Allow-Headers")
-        .allowedHeader("Authorization")
-        .allowedHeader("Access-Control-Allow-Method")
-        .allowedHeader("Access-Control-Allow-Origin")
-        .allowedHeader("Access-Control-Allow-Credentials")
-        .allowedHeader("Content-Type"));
+//    router.route().handler(CorsHandler.create("*")
+//        .allowedMethod(HttpMethod.GET)
+//        .allowedMethod(HttpMethod.POST)
+//        .allowedMethod(HttpMethod.OPTIONS)
+//        .allowedMethod(HttpMethod.DELETE)
+//        .allowedMethod(HttpMethod.PATCH)
+//        .allowedMethod(HttpMethod.PUT)
+//        .allowCredentials(true)
+//        .allowedHeader("Access-Control-Allow-Headers")
+//        .allowedHeader("Authorization")
+//        .allowedHeader("Access-Control-Allow-Method")
+//        .allowedHeader("Access-Control-Allow-Origin")
+//        .allowedHeader("Access-Control-Allow-Credentials")
+//        .allowedHeader("Content-Type"));
     router.route().handler(BodyHandler.create());
+
+    router.route().handler(ctx -> {
+        ctx.response()
+              .putHeader("Access-Control-Allow-Origin", "*")
+              .putHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE, PATCH, PUT")
+              .putHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+              .putHeader("Access-Control-Allow-Credentials", "true");
+
+        if (ctx.request().method() == HttpMethod.OPTIONS) {
+            ctx.response().setStatusCode(200).end();
+        } else {
+            ctx.next();
+        }
+    });
 
     // TODO Refactor split up into multiple handler files.
 
-    // NOTE: normally you make separate Handler classes for the handlers functions, but these service provider ones
-    // are so simple that we should probably just make them actual functions, maybe grouped in their own controller
-    // class if we want.
+    router.get("/service-providers").handler(this::listServProvsHandler);
     router.post("/service-providers/:serviceProviderId").handler(this::addServiceProviderHandler);
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 
@@ -81,8 +96,7 @@ public class ControllerVerticle extends AbstractVerticle {
     // TODO Only need to receive msgs on the user agent for the returning score in NSF use case, not Progressive.
 //    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
 
-//    int port = config().getInteger("http.port", 8080); // TODO CONFIG
-    int port = 8080;
+    int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     vertx.createHttpServer()
         .requestHandler(router)
         .listen(port)
@@ -94,6 +108,16 @@ public class ControllerVerticle extends AbstractVerticle {
         .onFailure(promise::fail);
   }
 
+  public void listServProvsHandler(RoutingContext ctx){
+      servProvService.listServProvs().onSuccess((List<JsonObject> servProvs) -> {
+          var servProvsArray = new JsonArray(servProvs);
+          ctx.response()
+              .setStatusCode(200)
+              .putHeader(HttpHeaders.CONTENT_TYPE.toString(), "application/json")
+              .end(servProvsArray.encodePrettily());
+      });
+  }
+
   /**
    * Handles post request for establishing a connection to a service provider given an invitation message JSON from
    * that service provider in the post body. This tells the ACA-Py agent that we have "received" the invitation
@@ -102,11 +126,12 @@ public class ControllerVerticle extends AbstractVerticle {
   private void addServiceProviderHandler(RoutingContext ctx){
     // Deserialize Vertx body via Gson (since ACA-Py wrapper takes Gson-serializable InvitationMessage):
     String servProvId = ctx.pathParam("serviceProviderId");
-    String invitationMsgUrl = ctx.body().asString();
+    String invitationMsgUrl = ctx.request().getFormAttribute("invitationUrl");
     QueryStringDecoder queryStringDecoder = new QueryStringDecoder(invitationMsgUrl);
     List<String> oobQueryParams = queryStringDecoder.parameters().get("oob");
-    if (oobQueryParams == null & oobQueryParams.size() != 0){
+    if (oobQueryParams == null || oobQueryParams.size() != 1){
       logger.error("Failed to find the single 'oob' query parameter in invitation URL");
+      ctx.response().setStatusCode(400).end();
       return;
     }
     String invitationJsonBase64 = oobQueryParams.get(0);
@@ -158,7 +183,7 @@ public class ControllerVerticle extends AbstractVerticle {
                 servProvService.deleteServProvConnMapping(servProvId)
                     .onSuccess((MongoClientDeleteResult deleteServProvObjResult) -> {
                       try {
-                        ariesClient.connectionsRemove(connId);
+                        ariesClient.connectionsRemove(connId); // TODO doesnt seem to remove connection on service provider side.
                       } catch (IOException e) {
                         logger.error("Failed to remove Service Provider connection.", e);
                         ctx.response().setStatusCode(500).end();
