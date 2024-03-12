@@ -52,6 +52,18 @@ public abstract class BaseServProvService {
       return promise.future();
     });
   }
+  public Future<JsonObject> getServProvData(String servProvId){
+    return getServProv(servProvId).compose(json -> {
+      Promise<JsonObject> promise = Promise.promise();
+      if (json.isPresent()){
+        promise.complete(json.get());
+      }
+      else{
+        promise.fail(new ServProvNotFoundException());
+      }
+      return promise.future();
+    });
+  }
 
   public Future<Optional<JsonObject>> getServProv(String servProvId){
     JsonObject query = new JsonObject()
@@ -68,8 +80,12 @@ public abstract class BaseServProvService {
    * no reason that you would want to "rename" or change this mapping in the future (although that is possible if we
    * want).
    */
-  public Future<String> setServProvConnId(String servProvId, String connId){
-    JsonObject document = new JsonObject().put("_id", servProvId).put("connId", connId);
+  public Future<String> setServProvConnId(String connId, String presentationExchangeId, JsonObject serverBannerData){
+    JsonObject document = new JsonObject()
+        .put("_id", connId)
+        .put("connId", connId)
+        .put("presentationExchangeId", presentationExchangeId)
+        .put("bannerData", serverBannerData);
     return this.client().save(this.collection(), document);
   }
 
