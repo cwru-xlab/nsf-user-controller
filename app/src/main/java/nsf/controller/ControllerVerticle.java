@@ -8,18 +8,18 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
-import io.vertx.ext.web.handler.CorsHandler;
 import nsf.access.*;
-import org.hyperledger.acy_py.generated.model.IndyRequestedCredsRequestedAttr;
+import org.hyperledger.acy_py.generated.model.SendMessage;
 import org.hyperledger.aries.AriesClient;
 import org.hyperledger.aries.api.connection.ConnectionReceiveInvitationFilter;
-import org.hyperledger.aries.api.connection.ConnectionRecord;
 import org.hyperledger.aries.api.connection.ReceiveInvitationRequest;
 import org.hyperledger.aries.api.out_of_band.InvitationMessage;
 import org.hyperledger.aries.api.out_of_band.OOBRecord;
@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,6 +41,7 @@ public class ControllerVerticle extends AbstractVerticle {
   private static final Logger logger = LoggerFactory.getLogger(ControllerVerticle.class);
 
   // TODO DI
+  private final MongoClient mongoClient;
   private final AriesClient ariesClient;
   private final BaseAccessControlService accessControlService;
   private final BaseServProvService servProvService;
@@ -59,8 +59,13 @@ public class ControllerVerticle extends AbstractVerticle {
 
   private final Map<String, RoutingContext> waitingForCredentialCtx = new ConcurrentHashMap<>();
 
-  public ControllerVerticle(AriesClient ariesClient, BaseAccessControlService accessControlService,
+  private final Map<String, Promise<JsonObject>> waitingForServerInfoCtx = new ConcurrentHashMap<>();
+  Random random = new Random();
+
+
+  public ControllerVerticle(MongoClient mongoClient, AriesClient ariesClient, BaseAccessControlService accessControlService,
                             BaseServProvService servProvService, BaseDataService dataService) {
+    this.mongoClient = mongoClient;
     this.ariesClient = ariesClient;
     this.accessControlService = accessControlService;
     this.servProvService = servProvService;
@@ -108,22 +113,25 @@ public class ControllerVerticle extends AbstractVerticle {
     router.post("/service-providers").handler(this::addServiceProviderHandler);
 //    router.post("/service-providers/:serviceProviderId/verify").handler(this::verifyCredentialWithServProvider);
     router.post("/verify").handler(this::verifyCredentialWithServProvider);
+    router.get("/service-providers/:serviceProviderId/data-menu").handler(this::getDataSharingSettingsHandler);
+    router.put("/service-providers/:serviceProviderId/data-menu").handler(this::setDataMenuSettings);
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
-    router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
+//    router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
     router.post("/add-credential").handler(this::addCredential);
 
     router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
         dataService, PushDataTransformer::transformPushableData));
 
+    router.get("/data-sources").handler(this::getDataSources);
+    router.post("/data-sources").handler(this::addDataSource);
+
     router.post("/get-data").handler(new GetDataHandler(dataService));
 
     router.post("/webhook/topic/connections").handler(this::connectionsUpdateHandler);
     router.post("/webhook/topic/issue_credential").handler(this::issueCredentialUpdate);
     router.post("/webhook/topic/present_proof").handler(this::presentProofUpdate);
-
-
-//    router.post("/webhook/topic/basicmessages").handler(new BasicMessageHandler(dataAccessHandler));
+    router.post("/webhook/topic/basicmessages").handler(this::basicMessageHandler);
 
     int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     vertx.createHttpServer()
@@ -135,6 +143,203 @@ public class ControllerVerticle extends AbstractVerticle {
           promise.complete();
         })
         .onFailure(promise::fail);
+  }
+
+
+  private void basicMessageHandler(RoutingContext webhookCtx){
+    JsonObject message = webhookCtx.body().asJsonObject();
+
+    String connId = message.getString("connection_id");
+    JsonObject basicMessagePackage = new JsonObject(message.getString("content"));
+
+//        String threadNonceId = basicMessagePackage.getString("threadNonceId");
+    String messageId = basicMessagePackage.getString("messageId");
+    String messageTypeId = basicMessagePackage.getString("messageTypeId");
+    JsonObject payloadData = basicMessagePackage.getJsonObject("payload");
+
+    logger.info("Received basic message: " + message.encodePrettily());
+
+    switch (messageTypeId){
+      case "INFO_RESPONSE":
+        var waitingCtx = waitingForServerInfoCtx.get(messageId);
+        waitingCtx.complete(payloadData);
+//        waitingCtx.response().setStatusCode(200).end(payloadData.encode());
+        break;
+    }
+
+    webhookCtx.response().setStatusCode(200).end();
+  }
+
+
+  private String generateMsgId(String connId){
+    // random nonce is needed to prevent async message threads from colliding with eachother (i.e. if multiple messages are being sent over the same connection at the same time -- so the nonce is used to link them).
+    return connId + "-" + String.valueOf(random.nextInt());
+  }
+
+  private void sendBasicMessage(String connId, String messageTypeId, JsonObject dataPayload, String messageId){
+    if (dataPayload == null){
+      dataPayload = new JsonObject();
+    }
+
+    if (messageId == null){
+      messageId = generateMsgId(connId);
+    }
+
+    JsonObject packagedJsonObj = new JsonObject()
+        .put("messageId", messageId)
+        .put("messageTypeId", messageTypeId)
+        .put("payload", dataPayload);
+
+    SendMessage basicMessageResponse = SendMessage.builder()
+        .content(packagedJsonObj.encode())
+        .build();
+
+    try {
+      ariesClient.connectionsSendMessage(connId, basicMessageResponse);
+    } catch (IOException e) {
+      logger.error("Failed to send info response to " + connId + ": " + e.toString());
+    }
+  }
+
+  /** Sets data sharing settings, and immediately shares relevant items. */
+  private void setDataMenuSettings(RoutingContext ctx){
+    String servProvId = ctx.pathParam("serviceProviderId");
+    var newDataMenuSettings = ctx.body().asJsonObject();
+
+    JsonObject dataMenuDoc = new JsonObject()
+        .put("_id", servProvId)
+        .put("dataMenu", newDataMenuSettings);
+
+    mongoClient.save("serv_prov_sharing", dataMenuDoc, h -> {
+      if (h.succeeded()){
+        
+
+        ctx.response().setStatusCode(200).end();
+      }
+      else{
+        ctx.response().setStatusCode(500).end();
+      }
+    });
+  }
+
+  private void getDataSharingSettingsHandler(RoutingContext ctx){
+    String servProvId = ctx.pathParam("serviceProviderId");
+    getCurrentDataSharingSettings(servProvId)
+        .onSuccess(dataSharingMenuOptional -> {
+          boolean updateDataMenuFromServProv = dataSharingMenuOptional.isEmpty();
+          JsonObject currentDataSharingMenu = dataSharingMenuOptional.orElseGet(JsonObject::new);
+
+          if (updateDataMenuFromServProv){
+            logger.info("fetching data menu from server...");
+            JsonObject query = new JsonObject()
+                .put("_id", servProvId);
+            mongoClient.find("service_providers", query)
+                .onSuccess(servProvData -> {
+                  String connId = servProvData.get(0).getString("connId");
+                  fetchServProvInfo(connId)
+                      .onSuccess(fetchedDataMenu -> {
+                        try{
+                          JsonObject dataMenu = fetchedDataMenu.getJsonObject("dataMenu");
+                          for (String dataSourceKey : dataMenu.fieldNames()) {
+                            JsonObject dataSource = dataMenu.getJsonObject(dataSourceKey);
+                            JsonObject dataSourceItems = dataSource.getJsonObject("items");
+                            for (String dataItemKey : dataSourceItems.fieldNames()) {
+                              JsonObject dataItem = dataSourceItems.getJsonObject(dataItemKey);
+
+                              // Only select items that were selected in the last menu:
+                              if (currentDataSharingMenu.containsKey(dataSourceKey) &&
+                                  currentDataSharingMenu.getJsonObject(dataSourceKey).getJsonObject("items").getBoolean("selected", false)){
+                                dataItem.put("selected", true);
+                              }
+                              else{
+                                // Deselect all items by default:
+                                dataItem.put("selected", false);
+                              }
+                            }
+                          }
+
+                          var document = new JsonObject()
+                              .put("_id", servProvId)
+                              .put("dataMenu", dataMenu);
+                          ctx.response().setStatusCode(200).end(document.encode());
+                          mongoClient.save("serv_prov_sharing", document);
+                        }
+                        catch (Exception e){
+                          logger.error(e.toString());
+                        }
+                      });
+                });
+          }
+          else{
+            ctx.response().setStatusCode(200).end(currentDataSharingMenu.encode());
+          }
+        })
+        .onFailure(e -> {
+          ctx.response().setStatusCode(500).end(e.toString());
+        });
+  }
+
+  private Future<Optional<JsonObject>> getCurrentDataSharingSettings(String servProvId){
+    JsonObject query = new JsonObject()
+        .put("_id", servProvId);
+    return mongoClient.find("serv_prov_sharing", query)
+        .compose(servProvSharingResults -> {
+          Promise<Optional<JsonObject>> promise = Promise.promise();
+
+          if (servProvSharingResults.size() == 0) {
+            promise.complete(Optional.empty());
+          } else {
+            promise.complete(Optional.of(servProvSharingResults.get(0)));
+          }
+          return promise.future();
+        });
+  }
+
+  private Future<JsonObject> fetchServProvInfo(String connId){
+    Promise<JsonObject> promise = Promise.promise();
+
+    String messageId = generateMsgId(connId);
+    waitingForServerInfoCtx.put(messageId, promise);
+
+    sendBasicMessage(connId, "INFO_REQUEST", null, messageId);
+    return promise.future();
+  }
+
+  private void addDataSource(RoutingContext ctx){
+    String dataSourceId = ctx.body().asJsonObject().getString("dataSourceId");
+    String accessToken = ctx.body().asJsonObject().getString("accessToken");
+    JsonObject dataSourceDoc = new JsonObject()
+        .put("_id", dataSourceId) // set ID to prevent duplicates / maintain idempotency.
+        .put("data_source_id", dataSourceId)
+        .put("access_token", accessToken);
+
+    mongoClient.save("data_sources", dataSourceDoc, h -> {
+      if (h.succeeded()){
+        ctx.response().setStatusCode(200).end();
+      }
+      else{
+        ctx.response().setStatusCode(500).end();
+      }
+    });
+  }
+
+  private void getDataSources(RoutingContext ctx){
+    JsonObject query = new JsonObject();
+    mongoClient.find("data_sources", query)
+        .onSuccess((List<JsonObject> dataSources) -> {
+          var dataSourcesMap = new JsonObject();
+          for (var dataSourceDoc : dataSources){
+            dataSourcesMap.put(dataSourceDoc.getString("data_source_id"), dataSourceDoc);
+          }
+
+          ctx.response()
+              .setStatusCode(200)
+              .putHeader(HttpHeaders.CONTENT_TYPE.toString(), "application/json")
+              .end(dataSourcesMap.encodePrettily());
+        })
+        .onFailure(e -> {
+          ctx.response().setStatusCode(500).end(e.toString());
+        });
   }
 
   private void addCredential(RoutingContext ctx){
@@ -162,8 +367,7 @@ public class ControllerVerticle extends AbstractVerticle {
       waitingForCredentialCtx.put(connId, ctx);
     } catch (IOException e) {
       logger.error("Failed to add Service Provider.", e);
-      ctx.response().setStatusCode(500).end();
-      throw new RuntimeException(e);
+      ctx.response().setStatusCode(500).end(e.toString());
     }
   }
 
@@ -453,37 +657,37 @@ public class ControllerVerticle extends AbstractVerticle {
         });
   }
 
-  /**
-   * REMARK: Currently access control is quite limited and does not allow fine-grain per-resource access control, as
-   * the access rules of a single service provider are currently defined by independent
-   */
-  private void setServiceProviderAccessControl(RoutingContext ctx){
-    String serviceProviderId = ctx.pathParam("serviceProviderId");
-
-    JsonObject product = ctx.body().asJsonObject();
-    PolicyModel policyModel = product.mapTo(PolicyModel.class);
-
-    servProvService.getServProv(serviceProviderId)
-        .onSuccess((Optional<JsonObject> nullableJsonObj) -> {
-          if (nullableJsonObj.isPresent()){
-            accessControlService.createPolicyById(policyModel.toEntity(serviceProviderId))
-                .onSuccess((String nullableResponse) -> {
-                  logger.info("Updated policy for ServProv: " + serviceProviderId);
-                  ctx.response().setStatusCode(200).end();
-                })
-                .onFailure((Throwable e) -> {
-                  logger.error("Failed to set policy for ServProv.", e);
-                  ctx.response().setStatusCode(500).send(e.toString());
-                });
-          }
-          else{
-            ctx.response().setStatusCode(400).send("Service Provider not found. Make sure you have added the Service " +
-                "Provider.");
-          }
-        })
-        .onFailure((Throwable e) ->{
-          logger.error("Failed to set access control policy.", e);
-          ctx.response().setStatusCode(500).send(e.toString());
-        });
-  }
+//  /**
+//   * REMARK: Currently access control is quite limited and does not allow fine-grain per-resource access control, as
+//   * the access rules of a single service provider are currently defined by independent
+//   */
+//  private void setServiceProviderAccessControl(RoutingContext ctx){
+//    String serviceProviderId = ctx.pathParam("serviceProviderId");
+//
+//    JsonObject product = ctx.body().asJsonObject();
+//    PolicyModel policyModel = product.mapTo(PolicyModel.class);
+//
+//    servProvService.getServProv(serviceProviderId)
+//        .onSuccess((Optional<JsonObject> nullableJsonObj) -> {
+//          if (nullableJsonObj.isPresent()){
+//            accessControlService.createPolicyById(policyModel.toEntity(serviceProviderId))
+//                .onSuccess((String nullableResponse) -> {
+//                  logger.info("Updated policy for ServProv: " + serviceProviderId);
+//                  ctx.response().setStatusCode(200).end();
+//                })
+//                .onFailure((Throwable e) -> {
+//                  logger.error("Failed to set policy for ServProv.", e);
+//                  ctx.response().setStatusCode(500).send(e.toString());
+//                });
+//          }
+//          else{
+//            ctx.response().setStatusCode(400).send("Service Provider not found. Make sure you have added the Service " +
+//                "Provider.");
+//          }
+//        })
+//        .onFailure((Throwable e) ->{
+//          logger.error("Failed to set access control policy.", e);
+//          ctx.response().setStatusCode(500).send(e.toString());
+//        });
+//  }
 }

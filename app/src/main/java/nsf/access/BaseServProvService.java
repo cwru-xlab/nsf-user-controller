@@ -5,6 +5,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
+import io.vertx.ext.mongo.UpdateOptions;
 import org.immutables.value.Value;
 
 import java.util.List;

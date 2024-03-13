@@ -44,7 +44,7 @@ public class App {
       BaseDataService dataService =
           DataService.builder().client(mongoClient).build();
 
-      vertx.deployVerticle(new ControllerVerticle(ariesClient, accessControlService, servProvService, dataService));
+      vertx.deployVerticle(new ControllerVerticle(mongoClient, ariesClient, accessControlService, servProvService, dataService));
     });
 
   }
