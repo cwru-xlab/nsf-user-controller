@@ -3,9 +3,7 @@ package nsf.controller;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
+import io.vertx.core.*;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.Json;
@@ -15,6 +13,9 @@ import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientDeleteResult;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
+import io.vertx.ext.web.codec.BodyCodec;
 import io.vertx.ext.web.handler.BodyHandler;
 import nsf.access.*;
 import org.hyperledger.acy_py.generated.model.SendMessage;
@@ -34,8 +35,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 public class ControllerVerticle extends AbstractVerticle {
   private static final Logger logger = LoggerFactory.getLogger(ControllerVerticle.class);
@@ -124,7 +127,7 @@ public class ControllerVerticle extends AbstractVerticle {
         dataService, PushDataTransformer::transformPushableData));
 
     router.get("/data-sources").handler(this::getDataSources);
-    router.post("/data-sources").handler(this::addDataSource);
+    router.post("/data-sources").handler(this::integrateDataSource);
 
     router.post("/get-data").handler(new GetDataHandler(dataService));
 
@@ -201,6 +204,219 @@ public class ControllerVerticle extends AbstractVerticle {
     }
   }
 
+
+  private static final String SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1";
+  private static final String SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
+  private static final String SPOTIFY_CLIENT_ID = "12ae5783c2a64348a38bec41901e54db";
+  private static final String SPOTIFY_CLIENT_SECRET = "088dae8acf30486f83c4672262ee0504";
+  /**
+   * Not actually used according to the API docs: https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow#:~:text=This%20parameter%20is%20used%20for%20validation%20only
+   */
+  private static final String REDIRECT_URI = "http://localhost:2999/profile";
+
+  private Future<String> refreshSpotifyAccessToken(){
+    JsonObject query = new JsonObject()
+        .put("_id", "spotify");
+    return mongoClient.find("data_sources", query)
+        .compose(sharingData -> {
+          Promise<String> promise = Promise.promise();
+          if (sharingData.size() > 0){
+            JsonObject spotifySharingData = sharingData.get(0);
+            String tempAccessToken = spotifySharingData.getString("temp_access_token");
+            String refreshToken = spotifySharingData.getString("refresh_token");
+            long expiresEpochSeconds = spotifySharingData.getLong("expires_epoch_seconds", 0L);
+
+            long currentEpochSeconds = Instant.now().getEpochSecond();
+
+            if (tempAccessToken == null || currentEpochSeconds - expiresEpochSeconds > 1800){
+              refreshSpotifyAccessToken(refreshToken)
+                  .onSuccess(newAccessToken -> {
+                    promise.complete(newAccessToken);
+                  })
+                  .onFailure(e -> {
+                    logger.error("failed to get access token: " + e.toString());
+                  });
+            }
+            else{
+              promise.complete(tempAccessToken);
+            }
+          }
+          else{
+            promise.fail("Spotify not integrated!");
+          }
+
+          return promise.future();
+        });
+  }
+  private Future<String> refreshSpotifyAccessToken(String refreshToken){
+    if (refreshToken == null || refreshToken.length() == 0){
+      logger.error("empty refresh token");
+      return Future.failedFuture(new Exception());
+    }
+
+    WebClient webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true));
+
+    Promise<String> promise = Promise.promise();
+
+    logger.info("Refreshing spotify tokens with refresh token: " + refreshToken);
+    webClient.postAbs(SPOTIFY_TOKEN_URL)
+        .putHeader("Content-Type", "application/x-www-form-urlencoded")
+        .basicAuthentication(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
+        .sendForm(
+            MultiMap.caseInsensitiveMultiMap()
+                .add("grant_type", "refresh_token")
+                .add("refresh_token", refreshToken),
+            response -> {
+              if (response.succeeded()) {
+                JsonObject responseBody = response.result().bodyAsJsonObject();
+
+                String accessToken = responseBody.getString("access_token");
+                String newRefreshToken = responseBody.getString("refresh_token");
+
+                if (newRefreshToken == null){
+                  logger.info("new refresh token not included. reusing the previous refresh token: " + refreshToken);
+                  newRefreshToken = refreshToken;
+                }
+
+                // Save token:
+                JsonObject dataSourceDoc = new JsonObject()
+                    .put("_id", "spotify")
+                    .put("data_source_id", "spotify")
+                    .put("expires_epoch_seconds", Instant.now().getEpochSecond() + 1800)
+                    .put("temp_access_token", accessToken)
+                    .put("refresh_token", newRefreshToken);
+
+                mongoClient.save("data_sources", dataSourceDoc, h -> {
+                  if (h.succeeded()){
+                    logger.info("saved refreshed tokens: " + accessToken);
+                    promise.complete(accessToken);
+                  }
+                  else{
+                    promise.fail("Failed to save new tokens.");
+                  }
+                });
+              } else {
+                promise.fail("Token response failed.");
+//                resultHandler.handle(Future.failedFuture("Error refreshing token"));
+              }
+            });
+
+    return promise.future();
+  }
+
+  private Future<JsonObject> callSpotifyApi(String url){
+    Promise<JsonObject> promise = Promise.promise();
+    refreshSpotifyAccessToken()
+        .onSuccess(accessToken -> {
+          WebClient webClient = WebClient.create(vertx);
+
+          webClient.getAbs(url)
+              .putHeader("Authorization", "Bearer " + accessToken)
+              .as(BodyCodec.jsonObject())
+              .send(ar -> {
+                if (ar.succeeded()) {
+                  JsonObject responseBody = ar.result().body();
+                  promise.complete(responseBody);
+                } else {
+                  promise.fail("Error fetching top artists: " + ar.cause());
+                }
+              });
+        })
+        .onFailure(e -> {
+          logger.error(e.toString());
+        });
+    return promise.future();
+  }
+
+  private Future<JsonArray> fetchSpotifyFavArtists(){
+    Promise<JsonArray> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/artists")
+        .onSuccess(responseBody -> {
+          JsonArray artists = responseBody.getJsonArray("items");
+          logger.info("User's fav artists: " + artists.encodePrettily());
+          promise.complete(artists);
+        })
+        .onFailure(e -> {
+          logger.error(e.toString());
+        });
+    return promise.future();
+  }
+
+  private Future<JsonArray> fetchSpotifyFavSong(){
+    Promise<JsonArray> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/tracks")
+        .onSuccess(responseBody -> {
+          JsonArray artists = responseBody.getJsonArray("items");
+          logger.info("User's fav songs: " + artists.encodePrettily());
+          promise.complete(artists);
+        })
+        .onFailure(e -> {
+          logger.error(e.toString());
+        });
+    return promise.future();
+  }
+
+  private Future<Integer> fetchSpotifyFollowedArtistsCount(){
+    Promise<Integer> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/following?type=artist")
+        .onSuccess(responseBody -> {
+          int followingCount = responseBody.getJsonObject("artists").getInteger("total");
+          logger.info("User's followed artists count: " + followingCount);
+          promise.complete(followingCount);
+        })
+        .onFailure(e -> {
+          logger.error(e.toString());
+        });
+    return promise.future();
+  }
+
+  private Future<String> fetchSpotifySubscriptionLevel(){
+    Promise<String> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me")
+        .onSuccess(responseBody -> {
+          String product = responseBody.getString("product");
+          promise.complete(product);
+        })
+        .onFailure(e -> {
+          logger.error(e.toString());
+        });
+    return promise.future();
+  }
+
+  private void dataPullCallback(Supplier<Future> futureSupplier, Promise promise, String dataSourceKey, String dataItemKey, String servProvId){
+    JsonObject lastSharedQuery = new JsonObject()
+        .put("_id", dataSourceKey + "-" + dataItemKey + "--" + servProvId);
+    mongoClient.find("last_shared_data", lastSharedQuery)
+        .onSuccess(lastSharedResults -> {
+          // Check if we should share this data item at this moment:
+          if (lastSharedResults.size() > 0) {
+            // && lastSharedResults.get(0).getLong("shared_timestamp") > x
+            logger.info("Already shared data item: " + dataSourceKey + "-" + dataItemKey + "--" + servProvId);
+            promise.complete(DataItemFetchedResponse.dontShareData());
+            return;
+          }
+
+          JsonObject cacheQuery = new JsonObject()
+              .put("_id", dataSourceKey + "-" + dataItemKey);
+          mongoClient.find("cached_pulled_data", cacheQuery)
+              .onSuccess(cacheResults -> {
+                if (cacheResults.size() > 0) {
+                  logger.info("Using cache for data item: " + dataSourceKey + "-" + dataItemKey);
+                  Object cachedData = cacheResults.get(0).getValue("data");
+                  promise.complete(new DataItemFetchedResponse(dataSourceKey, dataItemKey, cachedData, true));
+                } else {
+                  futureSupplier.get()
+                      .onSuccess(result -> {
+                        promise.complete(new DataItemFetchedResponse(dataSourceKey, dataItemKey, result, false));
+                      })
+                      .onFailure(e -> {
+                        logger.error(e.toString());
+                      });
+                }
+              });
+        });
+  }
+
   /** Sets data sharing settings, and immediately shares relevant items. */
   private void setDataMenuSettings(RoutingContext ctx){
     String servProvId = ctx.pathParam("serviceProviderId");
@@ -212,9 +428,141 @@ public class ControllerVerticle extends AbstractVerticle {
 
     mongoClient.save("serv_prov_sharing", dataMenuDoc, h -> {
       if (h.succeeded()){
-        
 
-        ctx.response().setStatusCode(200).end();
+//        List<Future<DataItemFetchedResponse>> futures = new ArrayList<>();
+        List<Future> futures = new ArrayList<>();
+//        List<Promise> promises = new ArrayList<>();
+
+        try{
+          for (String dataSourceKey : newDataMenuSettings.fieldNames()) {
+            JsonObject dataSource = newDataMenuSettings.getJsonObject(dataSourceKey);
+            JsonObject dataSourceItems = dataSource.getJsonObject("items");
+            for (String dataItemKey : dataSourceItems.fieldNames()) {
+              JsonObject dataItem = dataSourceItems.getJsonObject(dataItemKey);
+
+              if (dataItem.getBoolean("selected", false)){
+                Promise<DataItemFetchedResponse> promise = Promise.promise();
+                switch (dataSourceKey){
+                  case "spotify":
+                    switch (dataItemKey){
+                      case "fav-artist":
+                        dataPullCallback(this::fetchSpotifyFavArtists, promise, dataSourceKey, dataItemKey, servProvId);
+                        break;
+                      case "fav-song":
+                        dataPullCallback(this::fetchSpotifyFavSong, promise, dataSourceKey, dataItemKey, servProvId);
+                        break;
+                      case "following-artists-count":
+                        dataPullCallback(this::fetchSpotifyFollowedArtistsCount, promise, dataSourceKey, dataItemKey, servProvId);
+                        break;
+                      case "following-total-count":
+                        dataPullCallback(this::fetchSpotifySubscriptionLevel, promise, dataSourceKey, dataItemKey, servProvId);
+                        break;
+                      default:
+                        logger.error("unknown data item: " + dataItemKey);
+                        break;
+                    }
+                    break;
+                  default:
+                    logger.error("unknown data source: " + dataSourceKey);
+                    break;
+                }
+                futures.add(promise.future());
+              }
+            }
+          }
+        }
+        catch (Exception e){
+          logger.error(e.toString());
+        }
+
+//        for (Future future : futures){
+//          future.onSuccess(favArtists -> {
+//                // TODO generalize this and cache results.
+//            return new DataItemFetchedResponse(dataSourceKey, dataItemKey, favArtists);
+////                promise.complete(new DataItemFetchedResponse(dataSourceKey, dataItemKey, favArtists));
+//              })
+//              .onFailure(e -> {
+//                logger.error(e.toString());
+//              });
+//        }
+
+        logger.info("waiting for " + futures.size() + " data pulling items...");
+        CompositeFuture.join(futures)
+            .onSuccess(compositeHandler -> {
+              if (compositeHandler.succeeded()){
+                JsonObject query = new JsonObject()
+                    .put("_id", servProvId);
+                mongoClient.find("service_providers", query)
+                    .onSuccess(servProvData -> {
+                      String connId = servProvData.get(0).getString("connId");
+
+                      //                JsonObject dataSharePayload = new JsonObject();
+
+                      int sharedCount = 0;
+                      for (int i = 0; i < compositeHandler.result().size(); i++) {
+//                        var x = compositeHandler.result().size();
+////                        var y = compositeHandler.result().failed(0);
+                        DataItemFetchedResponse result = compositeHandler.result().resultAt(i);
+                        if (!result.dontShare){
+                          JsonObject dataSharePayload = new JsonObject();
+                          dataSharePayload.put("dataSourceId", result.dataSourceId);
+                          dataSharePayload.put("dataItemId", result.dataItemId);
+                          dataSharePayload.put("value", result.data);
+
+                          sendBasicMessage(connId, "SHARED_DATA", dataSharePayload, null);
+                          logger.info("shared " + result.dataSourceId + "-" + result.dataItemId + " to " + servProvId + ".");
+                          sharedCount++;
+                        }
+                      }
+
+                      logger.info("shared " + sharedCount + " items to " + servProvId + ".");
+                      JsonObject responseData = new JsonObject()
+                          .put("itemsSharedCount", sharedCount);
+                      ctx.response().setStatusCode(200).end(responseData.encode());
+
+                      // Bookkeeping:
+                      for (int i = 0; i < futures.size(); i++) {
+                        DataItemFetchedResponse result = compositeHandler.result().resultAt(i);
+
+                        // Update last_shared trackers:
+                        if (!result.dontShare){
+                          JsonObject lastSharedDoc = new JsonObject()
+                              .put("_id", result.dataSourceId + "-" + result.dataItemId + "--" + servProvId);
+                          mongoClient.save("last_shared_data", lastSharedDoc)
+                              .onSuccess(lastSharedResults -> {
+
+                              })
+                              .onFailure(e -> {
+                                logger.error(e.toString());
+                              });
+
+
+                          // Save results to cache:
+                          if (!result.isCached){
+                            // If the data item is not cached, then cache it:
+                            JsonObject cachedDocument = new JsonObject()
+                                .put("_id", result.dataSourceId + "-" + result.dataItemId)
+                                .put("data", result.data);
+                            mongoClient.save("cached_pulled_data", cachedDocument)
+                                .onSuccess(results -> {
+
+                                })
+                                .onFailure(e -> {
+                                  logger.error(e.toString());
+                                });
+                          }
+                        }
+                      }
+                    });
+              }
+              else{
+                logger.error("composite failed");
+                ctx.response().setStatusCode(500).end();
+              }
+            })
+            .onFailure(e -> {
+              logger.error(e.toString());
+            });
       }
       else{
         ctx.response().setStatusCode(500).end();
@@ -305,22 +653,56 @@ public class ControllerVerticle extends AbstractVerticle {
     return promise.future();
   }
 
-  private void addDataSource(RoutingContext ctx){
+  private void integrateDataSource(RoutingContext ctx){
     String dataSourceId = ctx.body().asJsonObject().getString("dataSourceId");
-    String accessToken = ctx.body().asJsonObject().getString("accessToken");
-    JsonObject dataSourceDoc = new JsonObject()
-        .put("_id", dataSourceId) // set ID to prevent duplicates / maintain idempotency.
-        .put("data_source_id", dataSourceId)
-        .put("access_token", accessToken);
+    String code = ctx.body().asJsonObject().getString("code");
 
-    mongoClient.save("data_sources", dataSourceDoc, h -> {
-      if (h.succeeded()){
-        ctx.response().setStatusCode(200).end();
-      }
-      else{
-        ctx.response().setStatusCode(500).end();
-      }
-    });
+    WebClient webClient = WebClient.create(vertx);
+
+    String tokenEndpoint = "https://accounts.spotify.com/api/token";
+    webClient.postAbs(tokenEndpoint)
+        .putHeader("Content-Type", "application/x-www-form-urlencoded")
+        .basicAuthentication(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
+        .sendForm(
+            MultiMap.caseInsensitiveMultiMap()
+                .add("grant_type", "authorization_code")
+                .add("code", code)
+                .add("redirect_uri", REDIRECT_URI),
+            ar -> {
+              if (ar.succeeded()) {
+                JsonObject responseBody = ar.result().bodyAsJsonObject();
+                String accessToken = responseBody.getString("access_token");
+                String refreshToken = responseBody.getString("refresh_token");
+
+                logger.info("Access Token: " + accessToken);
+                logger.info("Refresh Token: " + refreshToken);
+
+                if (refreshToken == null){
+                  logger.info("null refresh token, ignoring.");
+                  return;
+                }
+
+                JsonObject dataSourceDoc = new JsonObject()
+                    .put("_id", dataSourceId) // set ID to prevent duplicates / maintain idempotency.
+                    .put("data_source_id", dataSourceId)
+                    .put("expires_epoch_seconds", 0)
+//                    .put("expires_epoch_seconds", Instant.now().getEpochSecond() + 1800)
+//                    .put("temp_access_token", accessToken)
+                    .put("refresh_token", refreshToken);
+
+                mongoClient.save("data_sources", dataSourceDoc, h -> {
+                  if (h.succeeded()){
+                    ctx.response().setStatusCode(200).end();
+                  }
+                  else{
+                    ctx.response().setStatusCode(500).end();
+                  }
+                });
+              } else {
+                // Handle failure
+                ctx.response().setStatusCode(500).end("Error exchanging code for tokens");
+              }
+            });
   }
 
   private void getDataSources(RoutingContext ctx){
