@@ -63,6 +63,8 @@ public class ControllerVerticle extends AbstractVerticle {
   private final Map<String, RoutingContext> waitingForCredentialCtx = new ConcurrentHashMap<>();
 
   private final Map<String, Promise<JsonObject>> waitingForServerInfoCtx = new ConcurrentHashMap<>();
+  private final Map<String, RoutingContext> waitingForSharedDataAckCtx = new ConcurrentHashMap<>();
+
   Random random = new Random();
 
 
@@ -121,6 +123,7 @@ public class ControllerVerticle extends AbstractVerticle {
     router.delete("/service-providers/:serviceProviderId").handler(this::removeServiceProviderHandler);
 //    router.put("/access/:serviceProviderId").handler(this::setServiceProviderAccessControl);
 
+    router.get("/credentials").handler(this::listCredentials);
     router.post("/add-credential").handler(this::addCredential);
 
     router.post("/push-new-data").handler(new PushDataHandler(ariesClient, accessControlService, servProvService,
@@ -128,15 +131,20 @@ public class ControllerVerticle extends AbstractVerticle {
 
     router.get("/data-sources").handler(this::getDataSources);
     router.post("/data-sources").handler(this::integrateDataSource);
+    router.delete("/data-sources/:dataSourceId").handler(this::removeDataSource);
 
     router.post("/get-data").handler(new GetDataHandler(dataService));
+
+    router.get("/shared-data").handler(this::getCollectedData);
+
 
     router.post("/webhook/topic/connections").handler(this::connectionsUpdateHandler);
     router.post("/webhook/topic/issue_credential").handler(this::issueCredentialUpdate);
     router.post("/webhook/topic/present_proof").handler(this::presentProofUpdate);
+    router.post("/webhook/topic/out_of_band").handler(this::outOfBandHandler);
     router.post("/webhook/topic/basicmessages").handler(this::basicMessageHandler);
 
-    int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+    int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "9080"));
     vertx.createHttpServer()
         .requestHandler(router)
         .listen(port)
@@ -149,6 +157,36 @@ public class ControllerVerticle extends AbstractVerticle {
   }
 
 
+  private void getCollectedData(RoutingContext ctx){
+    JsonObject allQuery = new JsonObject();
+    mongoClient.find("shared_data_items", allQuery, h -> {
+      if (h.succeeded()){
+        JsonArray response = new JsonArray(h.result());
+        ctx.response().setStatusCode(200).end(response.encode());
+      }
+      else{
+        ctx.response().setStatusCode(500).end();
+      }
+    });
+  }
+
+
+  private void outOfBandHandler(RoutingContext ctx){
+    try{
+      JsonObject message = ctx.body().asJsonObject();
+
+      String user_connection_id = message.getString("connection_id");
+      String invitation_message_id = message.getString("invi_msg_id");
+
+      logger.info("out of band webhook: " + user_connection_id + ", " + invitation_message_id);
+
+      ctx.response().setStatusCode(200).end();
+    }
+    catch(Exception e){
+      ctx.response().setStatusCode(500).end();
+    }
+  }
+
   private void basicMessageHandler(RoutingContext webhookCtx){
     JsonObject message = webhookCtx.body().asJsonObject();
 
@@ -158,15 +196,47 @@ public class ControllerVerticle extends AbstractVerticle {
 //        String threadNonceId = basicMessagePackage.getString("threadNonceId");
     String messageId = basicMessagePackage.getString("messageId");
     String messageTypeId = basicMessagePackage.getString("messageTypeId");
-    JsonObject payloadData = basicMessagePackage.getJsonObject("payload");
+    Object payload = basicMessagePackage.getValue("payload");
 
     logger.info("Received basic message: " + message.encodePrettily());
 
     switch (messageTypeId){
       case "INFO_RESPONSE":
-        var waitingCtx = waitingForServerInfoCtx.get(messageId);
-        waitingCtx.complete(payloadData);
+        var waitingPromise = waitingForServerInfoCtx.remove(messageId);
+        JsonObject payloadData = (JsonObject)payload;
+        waitingPromise.complete(payloadData);
 //        waitingCtx.response().setStatusCode(200).end(payloadData.encode());
+        break;
+      case "VERIFY_RESPONSE":
+      {
+        var waitingCtx = waitingForPresentationResCtxs.remove(connId);
+        boolean isSuccessful = (Boolean)payload;
+        JsonObject query = new JsonObject().put("_id", connId);
+        JsonObject update = new JsonObject().put("$set", new JsonObject()
+            .put("presentationExchangeId", null)
+            .put("verifiedWith", isSuccessful));
+        mongoClient.updateCollection("service_providers", query, update, res -> {
+          if (res.succeeded()) {
+            logger.info("Updated servprov verification status: " + isSuccessful);
+            waitingCtx.response().setStatusCode(200).end(isSuccessful ? "true" : "false");
+          } else {
+            logger.error("Failed to update document: " + res.cause().getMessage());
+            waitingCtx.response().setStatusCode(500).end();
+          }
+        });
+      }
+        break;
+      case "SHARED_DATA_ACK":
+      {
+        var waitingCtx = waitingForSharedDataAckCtx.remove(messageId);
+        int sharedCount = (Integer)payload;
+        if (sharedCount < 0){
+          logger.warn("SP rejected shared data - not verified?");
+        }
+        JsonObject responseData = new JsonObject()
+            .put("itemsSharedCount", sharedCount);
+        waitingCtx.response().setStatusCode(200).end(responseData.encode());
+      }
         break;
     }
 
@@ -179,11 +249,7 @@ public class ControllerVerticle extends AbstractVerticle {
     return connId + "-" + String.valueOf(random.nextInt());
   }
 
-  private void sendBasicMessage(String connId, String messageTypeId, JsonObject dataPayload, String messageId){
-    if (dataPayload == null){
-      dataPayload = new JsonObject();
-    }
-
+  private void sendBasicMessage(String connId, String messageTypeId, Object dataPayload, String messageId){
     if (messageId == null){
       messageId = generateMsgId(connId);
     }
@@ -328,13 +394,14 @@ public class ControllerVerticle extends AbstractVerticle {
     return promise.future();
   }
 
-  private Future<JsonArray> fetchSpotifyFavArtists(){
-    Promise<JsonArray> promise = Promise.promise();
-    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/artists")
+  private Future<JsonObject> fetchSpotifyFavArtists(){
+    Promise<JsonObject> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/artists?time_range=long_term&limit=1&offset=0")
         .onSuccess(responseBody -> {
           JsonArray artists = responseBody.getJsonArray("items");
-          logger.info("User's fav artists: " + artists.encodePrettily());
-          promise.complete(artists);
+          JsonObject top = artists.getJsonObject(0);
+          logger.info("User's fav artist: " + top.encodePrettily());
+          promise.complete(top);
         })
         .onFailure(e -> {
           logger.error(e.toString());
@@ -342,13 +409,14 @@ public class ControllerVerticle extends AbstractVerticle {
     return promise.future();
   }
 
-  private Future<JsonArray> fetchSpotifyFavSong(){
-    Promise<JsonArray> promise = Promise.promise();
-    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/tracks")
+  private Future<JsonObject> fetchSpotifyFavSong(){
+    Promise<JsonObject> promise = Promise.promise();
+    callSpotifyApi(SPOTIFY_API_BASE_URL + "/me/top/tracks?time_range=long_term&limit=1&offset=0")
         .onSuccess(responseBody -> {
-          JsonArray artists = responseBody.getJsonArray("items");
-          logger.info("User's fav songs: " + artists.encodePrettily());
-          promise.complete(artists);
+          JsonArray tracks = responseBody.getJsonArray("items");
+          JsonObject top = tracks.getJsonObject(0);
+          logger.info("User's fav song: " + top.encodePrettily());
+          promise.complete(top);
         })
         .onFailure(e -> {
           logger.error(e.toString());
@@ -454,7 +522,7 @@ public class ControllerVerticle extends AbstractVerticle {
                       case "following-artists-count":
                         dataPullCallback(this::fetchSpotifyFollowedArtistsCount, promise, dataSourceKey, dataItemKey, servProvId);
                         break;
-                      case "following-total-count":
+                      case "spotify-subscription-level":
                         dataPullCallback(this::fetchSpotifySubscriptionLevel, promise, dataSourceKey, dataItemKey, servProvId);
                         break;
                       default:
@@ -486,6 +554,7 @@ public class ControllerVerticle extends AbstractVerticle {
 //              });
 //        }
 
+        // Wait for all data items to pull, and then send them all in one message:
         logger.info("waiting for " + futures.size() + " data pulling items...");
         CompositeFuture.join(futures)
             .onSuccess(compositeHandler -> {
@@ -499,26 +568,36 @@ public class ControllerVerticle extends AbstractVerticle {
                       //                JsonObject dataSharePayload = new JsonObject();
 
                       int sharedCount = 0;
+                      JsonArray dataShareItems = new JsonArray();
                       for (int i = 0; i < compositeHandler.result().size(); i++) {
 //                        var x = compositeHandler.result().size();
 ////                        var y = compositeHandler.result().failed(0);
                         DataItemFetchedResponse result = compositeHandler.result().resultAt(i);
                         if (!result.dontShare){
-                          JsonObject dataSharePayload = new JsonObject();
-                          dataSharePayload.put("dataSourceId", result.dataSourceId);
-                          dataSharePayload.put("dataItemId", result.dataItemId);
-                          dataSharePayload.put("value", result.data);
+                          JsonObject dataItemShare = new JsonObject();
+                          dataItemShare.put("dataSourceId", result.dataSourceId);
+                          dataItemShare.put("dataItemId", result.dataItemId);
+                          dataItemShare.put("data", result.data);
+                          dataShareItems.add(dataItemShare);
 
-                          sendBasicMessage(connId, "SHARED_DATA", dataSharePayload, null);
-                          logger.info("shared " + result.dataSourceId + "-" + result.dataItemId + " to " + servProvId + ".");
+                          logger.info("Sharing " + result.dataSourceId + "-" + result.dataItemId + " to " + servProvId + "...");
                           sharedCount++;
                         }
                       }
 
-                      logger.info("shared " + sharedCount + " items to " + servProvId + ".");
-                      JsonObject responseData = new JsonObject()
-                          .put("itemsSharedCount", sharedCount);
-                      ctx.response().setStatusCode(200).end(responseData.encode());
+                      if (sharedCount == 0){
+                        logger.info("Had no items to share to " + servProvId + ".");
+                        JsonObject responseData = new JsonObject()
+                            .put("itemsSharedCount", sharedCount);
+                        ctx.response().setStatusCode(200).end(responseData.encode());
+                      }
+                      else{
+                        String messageId = generateMsgId(connId);
+                        waitingForSharedDataAckCtx.put(messageId, ctx);
+                        sendBasicMessage(connId, "SHARED_DATA", dataShareItems, messageId);
+                        logger.info("Shared " + sharedCount + " items to " + servProvId + ".");
+                      }
+
 
                       // Bookkeeping:
                       for (int i = 0; i < futures.size(); i++) {
@@ -529,9 +608,18 @@ public class ControllerVerticle extends AbstractVerticle {
                           JsonObject lastSharedDoc = new JsonObject()
                               .put("_id", result.dataSourceId + "-" + result.dataItemId + "--" + servProvId);
                           mongoClient.save("last_shared_data", lastSharedDoc)
-                              .onSuccess(lastSharedResults -> {
+                              .onFailure(e -> {
+                                logger.error(e.toString());
+                              });
 
-                              })
+                          // Save results to activity history collection:
+                          JsonObject activityDoc = new JsonObject()
+                              .put("servProvId", servProvId)
+                              .put("epoch_seconds", Instant.now().getEpochSecond())
+                              .put("dataSourceId", result.dataSourceId)
+                              .put("dataItemId", result.dataItemId)
+                              .put("data", result.data);
+                          mongoClient.save("shared_data_items", activityDoc)
                               .onFailure(e -> {
                                 logger.error(e.toString());
                               });
@@ -544,9 +632,6 @@ public class ControllerVerticle extends AbstractVerticle {
                                 .put("_id", result.dataSourceId + "-" + result.dataItemId)
                                 .put("data", result.data);
                             mongoClient.save("cached_pulled_data", cachedDocument)
-                                .onSuccess(results -> {
-
-                                })
                                 .onFailure(e -> {
                                   logger.error(e.toString());
                                 });
@@ -653,6 +738,20 @@ public class ControllerVerticle extends AbstractVerticle {
     return promise.future();
   }
 
+  private void removeDataSource(RoutingContext ctx) {
+    String dataSourceId = ctx.pathParam("dataSourceId");
+    JsonObject query = new JsonObject()
+        .put("_id", dataSourceId);
+    mongoClient.removeDocument("data_sources", query, h -> {
+      if (h.succeeded()){
+        ctx.response().setStatusCode(200).end();
+      }
+      else{
+        ctx.response().setStatusCode(500).end();
+      }
+    });
+  }
+
   private void integrateDataSource(RoutingContext ctx){
     String dataSourceId = ctx.body().asJsonObject().getString("dataSourceId");
     String code = ctx.body().asJsonObject().getString("code");
@@ -724,12 +823,29 @@ public class ControllerVerticle extends AbstractVerticle {
         });
   }
 
+  private void listCredentials(RoutingContext ctx){
+    try {
+      var credentialsOptional = ariesClient.credentials();
+      var credentials = credentialsOptional.get();
+
+      JsonObject response = new JsonObject();
+      for (var credential : credentials){
+        response.put(credential.getCredentialDefinitionId(), "");
+      }
+
+      ctx.response().setStatusCode(200).end(response.encode());
+    } catch (Exception e) {
+      logger.error("Failed to accept issuer invitation.", e);
+      ctx.response().setStatusCode(500).end(e.toString());
+    }
+  }
+
   private void addCredential(RoutingContext ctx){
     String invitationUrl = ctx.body().asJsonObject().getString("invitationUrl");
     QueryStringDecoder queryStringDecoder = new QueryStringDecoder(invitationUrl);
-    List<String> inviteQueryParams = queryStringDecoder.parameters().get("d_m");
+    List<String> inviteQueryParams = queryStringDecoder.parameters().get("oob");
     if (inviteQueryParams == null || inviteQueryParams.size() != 1){
-      logger.error("Failed to find the single 'd_m' query parameter in invitation URL");
+      logger.error("Failed to find the single 'oob' query parameter in invitation URL");
       ctx.response().setStatusCode(400).end();
       return;
     }
@@ -737,18 +853,25 @@ public class ControllerVerticle extends AbstractVerticle {
     byte[] invitationMsgBytes = Base64.getDecoder().decode(invitationJsonBase64);
     String invitationMsgJsonStr = new String(invitationMsgBytes, StandardCharsets.UTF_8);
 
-    Type type = new TypeToken<ReceiveInvitationRequest>(){}.getType();
-    ReceiveInvitationRequest invitationMsg = new Gson().fromJson(invitationMsgJsonStr, type);
+//    Type type = new TypeToken<ReceiveInvitationRequest>(){}.getType();
+//    ReceiveInvitationRequest invitationMsg = new Gson().fromJson(invitationMsgJsonStr, type);
+    Type type = new TypeToken<InvitationMessage<Object>>(){}.getType();
+    InvitationMessage<Object> invitationMsg = new Gson().fromJson(invitationMsgJsonStr, type);
 
     try {
-      var connRecordOptional = ariesClient.connectionsReceiveInvitation(invitationMsg,
-          ConnectionReceiveInvitationFilter.builder().build());
-      var connRecord = connRecordOptional.orElseThrow();
-      String connId = connRecord.getConnectionId();
-
+//      var connRecordOptional = ariesClient.connectionsReceiveInvitation(invitationMsg,
+//          ConnectionReceiveInvitationFilter.builder().build());
+//      var connRecord = connRecordOptional.orElseThrow();
+//      String connId = connRecord.getConnectionId();
+      Optional<OOBRecord> oobRecordOptional = ariesClient.outOfBandReceiveInvitation(invitationMsg,
+          ReceiveInvitationFilter.builder().autoAccept(true).build());
+      var oobRecord = oobRecordOptional.orElseThrow();
+      String connId = String.valueOf(oobRecord.getConnectionId());
       waitingForCredentialCtx.put(connId, ctx);
+
+      logger.info("Accepted issuer invitation: " + connId);
     } catch (IOException e) {
-      logger.error("Failed to add Service Provider.", e);
+      logger.error("Failed to accept issuer invitation.", e);
       ctx.response().setStatusCode(500).end(e.toString());
     }
   }
@@ -765,15 +888,16 @@ public class ControllerVerticle extends AbstractVerticle {
               .autoRemove(true)
               .requestedAttributes(
                   Map.of(
-                      "issued_referent",
+                      "DL_number_referent",
                       SendPresentationRequest.IndyRequestedCredsRequestedAttr.builder()
                           .credId(credentialId)
                           .revealed(true)
                           .build()))
               .build());
 
+      var connId = presentationProofResponseOptional.get().getConnectionId();
       var presentationProofResponse = presentationProofResponseOptional.orElseThrow();
-      waitingForPresentationResCtxs.put(presentationExchangeId, ctx);
+      waitingForPresentationResCtxs.put(connId, ctx);
       // now wait for basic message to see if verified or not...
     } catch (IOException e) {
       logger.error("Failed to send presentation proof.", e);
@@ -810,27 +934,37 @@ public class ControllerVerticle extends AbstractVerticle {
         .compose(servProvData -> {
           Promise<JsonObject> promise = Promise.promise();
 
-          try {
-            var relevantCredId = checkServiceProviderRelevantCredential(servProvData
-                .getString("presentationExchangeId"));
-            servProvData
-                .put("relevantCredential", relevantCredId.orElse(""));
-          } catch (IOException e) {
-            promise.fail("Failed to do relevant credential query");
-          }
 
-          promise.complete(servProvData);
+            String presentationExchangeId = servProvData
+                .getString("presentationExchangeId");
+
+            // If we still need to verify, then lookup if the relevant credential exists:
+            if (presentationExchangeId != null){
+              try {
+                var relevantCredId = checkServiceProviderRelevantCredential(presentationExchangeId);
+                servProvData.put("relevantCredential", relevantCredId.orElse(""));
+              } catch (Exception e) {
+                logger.warn("Failed to do presentation exchange / relevant credential lookup." +
+                    " Assuming that the presentation_exchange ID in the service_provider document is orphaned, and refers to" +
+                    " a now-deleted presentation exchange record. Simply not returning the relevantCredential in this case.");
+                servProvData.put("relevantCredential", "");
+//              promise.fail("Failed to do relevant credential query: " + e.toString());
+              }
+            }
+
+            promise.complete(servProvData);
+
           return promise.future();
         });
   }
 
-  private Optional<String> checkServiceProviderRelevantCredential(String presentationExchangeId) throws IOException {
+  private Optional<String> checkServiceProviderRelevantCredential(String presentationExchangeId) throws Exception {
     Optional<List<PresentationRequestCredentials>> relevantCredentialsOptional = Optional.empty();
 //    try {
       relevantCredentialsOptional = ariesClient.presentProofRecordsCredentials(
           presentationExchangeId,
           PresentationRequestCredentialsFilter.builder()
-              .referent(List.of("issued_referent"))
+              .referent(List.of("DL_number_referent"))
               .build());
 //    } catch (IOException e) {
 //      logger.error("Failed to get relevant credentials.", e);
@@ -867,7 +1001,7 @@ public class ControllerVerticle extends AbstractVerticle {
       String connId = message.getString("connection_id");
 
       if (state.equals("request_received")){
-        var waitingCtx = waitingForPresentationReqCtxs.get(connId);
+        var waitingCtx = waitingForPresentationReqCtxs.remove(connId);
 
         try {
           var presentationRecordOptional = ariesClient.presentProofRecordsGetById(presentationExchangeId);
@@ -919,7 +1053,7 @@ public class ControllerVerticle extends AbstractVerticle {
 
       if (state.equals("deleted")){
         logger.info("issue_credential deleted, assuming added the credential properly.");
-        waitingForCredentialCtx.get(userConnectionId).end(credentialId);
+        waitingForCredentialCtx.remove(userConnectionId).end(credentialId);
         // ^ TODO add timeout timer to return 400 if no response.
       }
 
