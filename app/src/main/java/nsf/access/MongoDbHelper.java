@@ -9,7 +9,7 @@ public class MongoDbHelper {
     public static MongoClient getMongoClient(Vertx vertx) {
         JsonObject config = Vertx.currentContext().config();
         // TODO: add config file
-        String uri = System.getenv().getOrDefault("MONGO_DB_URI", "mongodb://host.docker.internal:27017");
+        String uri = System.getenv().getOrDefault("MONGO_DB_URI", "mongodb://host.docker.internal:37017");
         String db = config.getString("mongo_db", "nsf");
 
         JsonObject mongoConfig = new JsonObject()
