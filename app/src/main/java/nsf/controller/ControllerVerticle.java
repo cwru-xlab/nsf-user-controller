@@ -187,11 +187,20 @@ public class ControllerVerticle extends AbstractVerticle {
     }
   }
 
+  HashSet<String> uniqueMessagesMap = new HashSet<>();
+
   private void basicMessageHandler(RoutingContext webhookCtx){
     JsonObject message = webhookCtx.body().asJsonObject();
 
     String connId = message.getString("connection_id");
     JsonObject basicMessagePackage = new JsonObject(message.getString("content"));
+
+    String uniqueMessageId = basicMessagePackage.getString("uniqueMessageId");
+    if (uniqueMessagesMap.contains(uniqueMessageId)){
+      logger.warn("Duplicate message: " + message.encodePrettily());
+      return;
+    }
+    uniqueMessagesMap.add(uniqueMessageId);
 
 //        String threadNonceId = basicMessagePackage.getString("threadNonceId");
     String messageId = basicMessagePackage.getString("messageId");
@@ -255,6 +264,7 @@ public class ControllerVerticle extends AbstractVerticle {
     }
 
     JsonObject packagedJsonObj = new JsonObject()
+        .put("uniqueMessageId", messageId + "-" + String.valueOf(random.nextInt()))
         .put("messageId", messageId)
         .put("messageTypeId", messageTypeId)
         .put("payload", dataPayload);
@@ -374,17 +384,21 @@ public class ControllerVerticle extends AbstractVerticle {
     Promise<JsonObject> promise = Promise.promise();
     refreshSpotifyAccessToken()
         .onSuccess(accessToken -> {
-          WebClient webClient = WebClient.create(vertx);
+          WebClient webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true));
 
           webClient.getAbs(url)
               .putHeader("Authorization", "Bearer " + accessToken)
-              .as(BodyCodec.jsonObject())
               .send(ar -> {
                 if (ar.succeeded()) {
-                  JsonObject responseBody = ar.result().body();
-                  promise.complete(responseBody);
+                  try{
+                    JsonObject responseBody = ar.result().bodyAsJsonObject();
+                    promise.complete(responseBody);
+                  }
+                  catch (Exception e){
+                    promise.fail("Error calling spotify API: " + ar.result().statusCode() + " - " + ar.result().bodyAsString() + " - " + ar.cause());
+                  }
                 } else {
-                  promise.fail("Error fetching top artists: " + ar.cause());
+                  promise.fail("Error calling spotify API: " + ar.result().statusCode() + " - " + ar.result().bodyAsString() + " - " + ar.cause());
                 }
               });
         })
@@ -755,6 +769,7 @@ public class ControllerVerticle extends AbstractVerticle {
   private void integrateDataSource(RoutingContext ctx){
     String dataSourceId = ctx.body().asJsonObject().getString("dataSourceId");
     String code = ctx.body().asJsonObject().getString("code");
+    String redirectUri = ctx.body().asJsonObject().getString("redirectUri");
 
     WebClient webClient = WebClient.create(vertx);
 
@@ -766,13 +781,14 @@ public class ControllerVerticle extends AbstractVerticle {
             MultiMap.caseInsensitiveMultiMap()
                 .add("grant_type", "authorization_code")
                 .add("code", code)
-                .add("redirect_uri", REDIRECT_URI),
+                .add("redirect_uri", redirectUri),
             ar -> {
               if (ar.succeeded()) {
                 JsonObject responseBody = ar.result().bodyAsJsonObject();
                 String accessToken = responseBody.getString("access_token");
                 String refreshToken = responseBody.getString("refresh_token");
 
+                logger.info("spotify response: " + ar.result().statusCode() + " - " + responseBody.encodePrettily());
                 logger.info("Access Token: " + accessToken);
                 logger.info("Refresh Token: " + refreshToken);
 
